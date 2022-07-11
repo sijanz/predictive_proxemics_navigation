@@ -2,7 +2,7 @@
 
 #include <map>
 #include <vector>
-#include "utils.hpp"
+#include "utils.h"
 
 class GroupDetector
 {

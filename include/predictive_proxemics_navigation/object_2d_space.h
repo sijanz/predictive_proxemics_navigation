@@ -40,7 +40,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <tf/transform_datatypes.h>
 
-#include "robust_people_follower/stamped_types.h"
+#include "stamped_types.h"
 
 
 /**

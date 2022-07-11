@@ -3,7 +3,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include "../include/astar.hpp"
+#include "predictive_proxemics_navigation/astar.h"
 
 
 AStar::AStar(const std::vector<std::vector<int>>& newMap)

@@ -1,4 +1,4 @@
-#include "../include/agent.hpp"
+#include "predictive_proxemics_navigation/agent.h"
 
 
 Agent::Agent(float t_speed, const std::deque<Point3f> t_waypoints) : m_desired_speed{t_speed}, m_path{t_waypoints}

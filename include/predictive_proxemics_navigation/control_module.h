@@ -40,7 +40,7 @@
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/Twist.h>
 
-#include "robust_people_follower/status_module.h"
+#include "status_module.h"
 
 
 /**

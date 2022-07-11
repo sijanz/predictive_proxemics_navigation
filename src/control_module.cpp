@@ -38,10 +38,10 @@
 #include <geometry_msgs/Pose.h>
 #include <tf/LinearMath/Vector3.h>
 #include <tf/LinearMath/Matrix3x3.h>
-#include <robust_people_follower/person.h>
+#include "predictive_proxemics_navigation/person.h"
 
-#include "robust_people_follower/control_module.h"
-#include "robust_people_follower/object_2d_space.h"
+#include "predictive_proxemics_navigation/control_module.h"
+#include "predictive_proxemics_navigation/object_2d_space.h"
 
 
 ControlModule::ControlModule() : m_current_linear{}, m_current_angular{}
@@ -71,115 +71,47 @@ geometry_msgs::Twist ControlModule::velocityCommand(StatusModule::Status& t_stat
                                                     const geometry_msgs::PoseStamped& t_pose,
                                                     const Person& t_target, const double t_follow_threshold)
 {
-    auto distance_to_target{t_target.distance()};
 
-    if (distance_to_target == 0)
-        distance_to_target = t_follow_threshold + 200;
-
-    if (t_status == StatusModule::Status::FOLLOWING && distance_to_target < t_follow_threshold + 200)
-        m_waypoint_list->clear();
-
-    // set status to SEARCHING if waypoint list is empty
-    if (t_status == StatusModule::Status::LOS_LOST && m_waypoint_list->empty())
-        t_status = StatusModule::Status::SEARCHING;
+    // target is above threshold, follow him using waypoints
 
     auto speed{geometry_msgs::Twist{}};
 
-    if (distance_to_target > (t_follow_threshold + 200) && t_status == StatusModule::Status::FOLLOWING)
-        addNewWaypoint(t_target.pose(), 4);
+    auto current_goal{m_waypoint_list->at(0)};
 
-    // if target is too near, move backwards
-    if (distance_to_target < 1000) {
+    auto theta{Object2DSpace::yawFromPose(t_pose)};
 
-        speed.linear.x = 2 * (distance_to_target / 1000) - 2;
+    auto rotation{tf::Matrix3x3{
+            cos(theta), -sin(theta), t_pose.pose.position.x,
+            sin(theta), cos(theta), t_pose.pose.position.y,
+            0.0, 0.0, 1.0
+    }};
 
-        // maximum of 0.6 m/s linear velocity
-        if (speed.linear.x < -0.6)
-            speed.linear.x = -0.6;
+    auto global_vector{tf::Vector3{current_goal.point.x, current_goal.point.y, 1.0}};
+    auto local_vector{rotation.inverse() * global_vector};
 
-        if (t_target.yDeviation() < -50) {
-            speed.angular.z = -0.0025 * std::abs(t_target.yDeviation());
-        } else if (t_target.yDeviation() > 50) {
-            speed.angular.z = 0.0025 * t_target.yDeviation();
-        } else
-            speed.angular.z = 0;
+    auto local_angle_to_goal{atan2(local_vector.y(), local_vector.x())};
 
-        // target is under threshold, only keep him centered
-    } else if (distance_to_target > 1000 && distance_to_target < t_follow_threshold) {
+    auto distance_to_goal{sqrt(pow(current_goal.point.x - t_pose.pose.position.x, 2) +
+                                pow(current_goal.point.y - t_pose.pose.position.y, 2))};
 
-        if (t_target.yDeviation() < -50) {
-            speed.angular.z = -0.0025 * std::abs(t_target.yDeviation());
-        } else if (t_target.yDeviation() > 50) {
-            speed.angular.z = 0.0025 * t_target.yDeviation();
-        } else
-            speed.angular.z = 0;
+    auto speed_linear{0.6};
 
-    } else if (distance_to_target >= t_follow_threshold && distance_to_target <= t_follow_threshold + 400) {
+    // robot has reached the goal
+    if (distance_to_goal < 0.3) {
 
-        speed.linear.x = 1.5 * (distance_to_target / 1000) - 2.7;
+        // input less acceleration
+        speed.linear.x = m_current_linear - (m_current_linear / 100) * 40;
+        speed.angular.z = m_current_angular - (m_current_angular / 100) * 40;
 
-        // maximum of 0.6 m/s linear velocity
-        if (speed.linear.x > 0.6)
-            speed.linear.x = 0.6;
+        m_waypoint_list->pop_front();
 
-        if (t_target.yDeviation() < -50) {
-            speed.angular.z = -0.0025 * std::abs(t_target.yDeviation());
-        } else if (t_target.yDeviation() > 50) {
-            speed.angular.z = 0.0025 * t_target.yDeviation();
-        } else
-            speed.angular.z = 0;
+    } else if (local_angle_to_goal > 0.0)
+        speed.angular.z = 1.0 * local_angle_to_goal;
+    else if (local_angle_to_goal < -0.0)
+        speed.angular.z = -1.0 * std::abs(local_angle_to_goal);
 
+    speed.linear.x = speed_linear;
 
-        // target is above threshold, follow him using waypoints
-    } else if (distance_to_target > (t_follow_threshold + 200) && !m_waypoint_list->empty()) {
-
-        auto current_goal{m_waypoint_list->at(0)};
-
-        auto theta{Object2DSpace::yawFromPose(t_pose)};
-
-        auto rotation{tf::Matrix3x3{
-                cos(theta), -sin(theta), t_pose.pose.position.x,
-                sin(theta), cos(theta), t_pose.pose.position.y,
-                0.0, 0.0, 1.0
-        }};
-
-        auto global_vector{tf::Vector3{current_goal.point.x, current_goal.point.y, 1.0}};
-        auto local_vector{rotation.inverse() * global_vector};
-
-        auto local_angle_to_goal{atan2(local_vector.y(), local_vector.x())};
-
-        auto distance_to_goal{sqrt(pow(current_goal.point.x - t_pose.pose.position.x, 2) +
-                                   pow(current_goal.point.y - t_pose.pose.position.y, 2))};
-
-        auto speed_linear{0.6};
-
-        if (t_status == StatusModule::Status::FOLLOWING) {
-
-            // TODO: make linear speed variable again (in dependence of distance to target)
-//            auto n{-(0.32 * ((FOLLOW_THRESHOLD / 1000) - 0.2))};
-            speed_linear = 1.5 * (distance_to_target / 1000) - 2.7;
-
-            // maximum of 0.6 m/s linear velocity
-            if (speed_linear > 0.6)
-                speed_linear = 0.6;
-        }
-
-        // robot has reached the goal
-        if (distance_to_goal < 0.3) {
-
-            // input less acceleration
-            speed.linear.x = m_current_linear - (m_current_linear / 100) * 40;
-            speed.angular.z = m_current_angular - (m_current_angular / 100) * 40;
-
-            m_waypoint_list->pop_front();
-
-        } else if (local_angle_to_goal > 0.0)
-            speed.angular.z = 1.0 * local_angle_to_goal;
-        else if (local_angle_to_goal < -0.0)
-            speed.angular.z = -1.0 * std::abs(local_angle_to_goal);
-
-        speed.linear.x = speed_linear;
-    }
 
     m_current_linear = speed.linear.x;
     m_current_angular = speed.angular.z;

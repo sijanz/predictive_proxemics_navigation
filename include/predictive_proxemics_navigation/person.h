@@ -40,11 +40,10 @@
 #include <cmath>
 
 #include <ros/ros.h>
-#include <body_tracker_msgs/Skeleton.h>
 #include <geometry_msgs/Point32.h>
 #include <deque>
 
-#include "robust_people_follower/object_2d_space.h"
+#include "object_2d_space.h"
 
 
 /**
@@ -56,21 +55,11 @@ public:
 
     // special methods
     Person() = default;
-    explicit Person(const body_tracker_msgs::Skeleton& t_skeleton);
     inline Person& operator=(const Person& rhs) = default;
-    inline bool operator==(const int t_id) { return t_id == m_skeleton.body_id; }
 
     // inherited methods
     void printInfo() const override;
 
-    // setters
-    inline bool& target() { return m_is_target; }
-    inline ros::Time& gestureBegin() { return m_gesture_begin; }
-
-    // getters
-    inline const bool target() const { return m_is_target; }
-    inline const double distance() const { return m_skeleton.centerOfMass.x; }
-    inline const double yDeviation() const { return m_skeleton.centerOfMass.y; }
     inline const double meanVelocity() const { return m_mean_velocity; }
     inline const double meanAngle() const { return m_mean_angle; }
 
@@ -84,13 +73,11 @@ public:
     inline const std::deque<AngleStamped>& meanAngles() const { return m_mean_angles; }
 
     void printVerboseInfo() const;
-    bool correctHandHeight() const;
-    void updateState(const body_tracker_msgs::Skeleton& t_skeleton, const geometry_msgs::PoseStamped& t_robot_pose);
+    void updateState(const geometry_msgs::PoseStamped& t_robot_pose);
 
 
 private:
     bool m_is_target{};
-    body_tracker_msgs::Skeleton m_skeleton{};
     ros::Time m_gesture_begin{};
     std::shared_ptr<std::vector<geometry_msgs::PoseStamped>> m_poses{};
     double m_mean_velocity{};

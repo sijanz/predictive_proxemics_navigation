@@ -1,4 +1,4 @@
-#include "../include/group_detector.hpp"
+#include "predictive_proxemics_navigation/group_detector.h"
 
 
 std::vector<Utils::GroupInformation> GroupDetector::detectGroups(const std::vector<Utils::PedestrianInformation>& t_pedestrians)

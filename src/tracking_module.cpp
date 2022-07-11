@@ -34,11 +34,11 @@
 
 
 #include <tf/LinearMath/Matrix3x3.h>
-#include <robust_people_follower/status_module.h>
-#include "robust_people_follower/tracking_module.h"
+// #include <robust_people_follower/status_module.h>
+#include "predictive_proxemics_navigation/tracking_module.h"
 
 
-TrackingModule::TrackingModule() : m_target{}
+TrackingModule::TrackingModule()
 {
     m_tracked_persons = std::make_shared<std::vector<Person>>();
 }

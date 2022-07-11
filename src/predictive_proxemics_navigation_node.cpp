@@ -39,7 +39,7 @@
 #include <chrono>
 #include <ctime>
 
-#include "../include/predictive_proxemics_navigation_node.h"
+#include "predictive_proxemics_navigation/predictive_proxemics_navigation_node.h"
 
 
 PredictiveProxemicsNavigation::PredictiveProxemicsNavigation(const std::string& t_name)
@@ -47,17 +47,22 @@ PredictiveProxemicsNavigation::PredictiveProxemicsNavigation(const std::string& 
 {
     m_name = t_name;
 
-    m_bumper_sub = m_nh.subscribe("/mobile_base/events/bumper", 10, &RobustPeopleFollower::bumperCallback, this);
-    m_odom_sub = m_nh.subscribe("/odom", 10, &RobustPeopleFollower::odometryCallback, this);
-    m_skeleton_sub = m_nh.subscribe("/body_tracker/skeleton", 10, &RobustPeopleFollower::skeletonCallback, this);
+    m_bumper_sub = m_nh.subscribe("/mobile_base/events/bumper", 10, &PredictiveProxemicsNavigation::bumperCallback, this);
+    m_odom_sub = m_nh.subscribe("/odom", 10, &PredictiveProxemicsNavigation::odometryCallback, this);
+
+    // TODO: position callback
 
     m_velocity_command_pub = m_nh.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1000);
     m_visualization_pub = m_nh.advertise<visualization_msgs::Marker>("robust_people_follower/markers", 10);
 
     // TODO: get starting point
     // TODO: get goal point
+    
+    std::vector<std::vector<int>> traversible{};
+    Point3f robot_start{};
+    Point3f robot_goal{};
 
-    m_navigation_algorithm = RobotNavigationAlgorithm{0.05, 1.2, ep.get_environment().building_traversible, robot_start, robot_goal};
+    m_navigation_algorithm = RobotNavigationAlgorithm{0.05, 1.2, traversible, robot_start, robot_goal};
 }
 
 
@@ -167,7 +172,6 @@ void PredictiveProxemicsNavigation::processCallbacks()
 
     // reset flags to only process data once in a loop iteration
     m_status_module.valuesSet() = false;
-    m_tracking_module.target().valuesSet() = false;
     for (auto& p : *m_tracking_module.trackedPersons())
         p.valuesSet() = false;
 }
@@ -181,14 +185,6 @@ void PredictiveProxemicsNavigation::debugPrintout() const
     ROS_INFO_STREAM("ROS time: " << ros::Time::now().sec);
     m_status_module.printInfo();
 }
-
-void PredictiveProxemicsNavigation::followTarget()
-{
-    m_velocity_command_pub.publish(m_control_module.velocityCommand(m_status_module.status(),
-                                                                    m_status_module.pose(),
-                                                                    m_tracking_module.target(), FOLLOW_THRESHOLD));
-}
-
 
 void PredictiveProxemicsNavigation::bumperCallback(const kobuki_msgs::BumperEventConstPtr& msg)
 {
@@ -209,85 +205,86 @@ void PredictiveProxemicsNavigation::odometryCallback(const nav_msgs::Odometry::C
 }
 
 
+// TODO: reimplement
 void PredictiveProxemicsNavigation::publishPersonMarkers() const
 {
-    auto person_markers{std::vector<visualization_msgs::Marker>{}};
-    auto person_vectors{std::vector<visualization_msgs::Marker>{}};
+    // auto person_markers{std::vector<visualization_msgs::Marker>{}};
+    // auto person_vectors{std::vector<visualization_msgs::Marker>{}};
 
-    auto i{0};
-    for (const auto& p : *m_tracking_module.trackedPersons()) {
-        if (p.distance() > 0) {
+    // auto i{0};
+    // for (const auto& p : *m_tracking_module.trackedPersons()) {
+    //     if (p.distance() > 0) {
 
-            // person marker
-            visualization_msgs::Marker marker{};
-            marker.header.frame_id = "odom";
-            marker.header.stamp = ros::Time::now();
-            marker.ns = "persons";
-            marker.id = i;
-            marker.type = visualization_msgs::Marker::MESH_RESOURCE;
-            marker.action = visualization_msgs::Marker::ADD;
-            marker.lifetime = ros::Duration{0.3};
-            marker.pose.position.x = p.pose().pose.position.x;
-            marker.pose.position.y = p.pose().pose.position.y;
-            marker.pose.orientation.w = 1.0;
+    //         // person marker
+    //         visualization_msgs::Marker marker{};
+    //         marker.header.frame_id = "odom";
+    //         marker.header.stamp = ros::Time::now();
+    //         marker.ns = "persons";
+    //         marker.id = i;
+    //         marker.type = visualization_msgs::Marker::MESH_RESOURCE;
+    //         marker.action = visualization_msgs::Marker::ADD;
+    //         marker.lifetime = ros::Duration{0.3};
+    //         marker.pose.position.x = p.pose().pose.position.x;
+    //         marker.pose.position.y = p.pose().pose.position.y;
+    //         marker.pose.orientation.w = 1.0;
 
-            marker.scale.x = 1.0;
-            marker.scale.y = 1.0;
-            marker.scale.z = 1.0;
+    //         marker.scale.x = 1.0;
+    //         marker.scale.y = 1.0;
+    //         marker.scale.z = 1.0;
 
-            marker.color.a = 1.0;
-            marker.color.r = 1.0;
-            marker.color.g = 0.5;
+    //         marker.color.a = 1.0;
+    //         marker.color.r = 1.0;
+    //         marker.color.g = 0.5;
 
-            marker.mesh_resource = "package://robust_people_follower/meshes/standing.dae";
+    //         marker.mesh_resource = "package://robust_people_follower/meshes/standing.dae";
 
-            // show a green marker for a tracked person
-            if (p.target()) {
-                marker.color.r = 0.0;
-                marker.color.g = 1.0;
-            }
+    //         // show a green marker for a tracked person
+    //         if (p.target()) {
+    //             marker.color.r = 0.0;
+    //             marker.color.g = 1.0;
+    //         }
 
-            person_markers.emplace_back(marker);
-
-
-            // person vector
-            auto vector{visualization_msgs::Marker{}};
-            vector.header.frame_id = "odom";
-            vector.header.stamp = ros::Time::now();
-            vector.ns = "vectors";
-            vector.id = i;
-            vector.type = visualization_msgs::Marker::ARROW;
-            vector.action = visualization_msgs::Marker::ADD;
-            vector.lifetime = ros::Duration{0.3};
-            vector.pose.position.x = p.pose().pose.position.x;
-            vector.pose.position.y = p.pose().pose.position.y;
-            vector.pose.position.z = 1.3;
-
-            auto q{tf::Quaternion{tf::createQuaternionFromYaw(p.meanAngle())}};
-            vector.pose.orientation.x = q.getX();
-            vector.pose.orientation.y = q.getY();
-            vector.pose.orientation.z = q.getZ();
-            vector.pose.orientation.w = q.getW();
-
-            vector.scale.x = VECTOR_LENGTH_FACTOR * p.meanVelocity();
-            vector.scale.y = 0.1;
-            vector.scale.z = 0.1;
-
-            vector.color.a = 1.0;
-            vector.color.r = 1.0;
-
-            person_vectors.emplace_back(vector);
+    //         person_markers.emplace_back(marker);
 
 
-            ++i;
-        }
-    }
+    //         // person vector
+    //         auto vector{visualization_msgs::Marker{}};
+    //         vector.header.frame_id = "odom";
+    //         vector.header.stamp = ros::Time::now();
+    //         vector.ns = "vectors";
+    //         vector.id = i;
+    //         vector.type = visualization_msgs::Marker::ARROW;
+    //         vector.action = visualization_msgs::Marker::ADD;
+    //         vector.lifetime = ros::Duration{0.3};
+    //         vector.pose.position.x = p.pose().pose.position.x;
+    //         vector.pose.position.y = p.pose().pose.position.y;
+    //         vector.pose.position.z = 1.3;
 
-    // publish markers
-    for (const auto& m : person_markers)
-        m_visualization_pub.publish(m);
-    for (const auto& m : person_vectors)
-        m_visualization_pub.publish(m);
+    //         auto q{tf::Quaternion{tf::createQuaternionFromYaw(p.meanAngle())}};
+    //         vector.pose.orientation.x = q.getX();
+    //         vector.pose.orientation.y = q.getY();
+    //         vector.pose.orientation.z = q.getZ();
+    //         vector.pose.orientation.w = q.getW();
+
+    //         vector.scale.x = VECTOR_LENGTH_FACTOR * p.meanVelocity();
+    //         vector.scale.y = 0.1;
+    //         vector.scale.z = 0.1;
+
+    //         vector.color.a = 1.0;
+    //         vector.color.r = 1.0;
+
+    //         person_vectors.emplace_back(vector);
+
+
+    //         ++i;
+    //     }
+    // }
+
+    // // publish markers
+    // for (const auto& m : person_markers)
+    //     m_visualization_pub.publish(m);
+    // for (const auto& m : person_vectors)
+    //     m_visualization_pub.publish(m);
 }
 
 

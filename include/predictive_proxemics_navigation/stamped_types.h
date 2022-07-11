@@ -1,5 +1,4 @@
-#ifndef ROBUST_PEOPLE_FOLLOWER_STAMPED_TYPES_H
-#define ROBUST_PEOPLE_FOLLOWER_STAMPED_TYPES_H
+#pragma once
 
 
 #include <tf/LinearMath/Quaternion.h>
@@ -101,6 +100,3 @@ struct AngleStamped
      */
     AngleStamped(const double t_angle, const ros::Time& t_stamp) : angle{t_angle}, stamp{t_stamp} {}
 };
-
-
-#endif //ROBUST_PEOPLE_FOLLOWER_STAMPED_TYPES_H

@@ -35,29 +35,28 @@
 
 #include <tf/transform_datatypes.h>
 
-#include "robust_people_follower/person.h"
+#include "predictive_proxemics_navigation/person.h"
 
 
-Person::Person(const body_tracker_msgs::Skeleton& t_skeleton)
-        : m_is_target{}, m_skeleton{t_skeleton}, m_gesture_begin{}, m_mean_velocity{},
-          m_mean_angle{}, m_mean_velocities{std::deque<VelocityStamped>{}}, m_mean_angles{std::deque<AngleStamped>{}}
-{
-    m_poses = std::make_shared<std::vector<geometry_msgs::PoseStamped>>();
-    m_velocities = std::make_shared<std::vector<VelocityStamped>>();
-}
+// Person::Person(const body_tracker_msgs::Skeleton& t_skeleton)
+//         : m_is_target{}, m_skeleton{t_skeleton}, m_gesture_begin{}, m_mean_velocity{},
+//           m_mean_angle{}, m_mean_velocities{std::deque<VelocityStamped>{}}, m_mean_angles{std::deque<AngleStamped>{}}
+// {
+//     m_poses = std::make_shared<std::vector<geometry_msgs::PoseStamped>>();
+//     m_velocities = std::make_shared<std::vector<VelocityStamped>>();
+// }
 
 
 void Person::printInfo() const
 {
-    ROS_INFO("id: %d, is target: %d, distance: %f, velocity: %f, gestures: %d, correct height: %d, last seen: %f",
-             m_skeleton.body_id, m_is_target, m_skeleton.centerOfMass.x, m_velocity, m_skeleton.gesture,
-             this->correctHandHeight(), this->lastSeen());
+    // ROS_INFO("id: %d, is target: %d, distance: %f, velocity: %f, gestures: %d, correct height: %d, last seen: %f",
+    //          0, m_is_target, m_skeleton.centerOfMass.x, m_velocity, m_skeleton.gesture,
+    //          this->correctHandHeight(), this->lastSeen());
 }
 
 
 void Person::printVerboseInfo() const
 {
-    ROS_INFO_STREAM("id : " << m_skeleton.body_id);
     if (!m_poses->empty()) {
         ROS_INFO_STREAM("  pose vector size: " << m_poses->size());
         ROS_INFO_STREAM("  last seen: " << this->lastSeen());
@@ -66,16 +65,13 @@ void Person::printVerboseInfo() const
     ROS_INFO_STREAM("  mean mean veloctiy: " << m_mean_mean_velocity);
     ROS_INFO_STREAM("  mean angle: " << m_mean_angle * (180 / M_PI));
     ROS_INFO_STREAM("  mean mean angle: " << m_mean_mean_angle * (180 / M_PI));
-    ROS_INFO_STREAM("  distance: " << m_skeleton.centerOfMass.x);
-    ROS_INFO_STREAM("  delta-y: " << m_skeleton.centerOfMass.y << "\n");
 }
 
 
-void Person::updateState(const body_tracker_msgs::Skeleton& t_skeleton, const geometry_msgs::PoseStamped& t_robot_pose)
+void Person::updateState(const geometry_msgs::PoseStamped& t_robot_pose)
 {
     if (!m_values_set) {
 
-        m_skeleton = t_skeleton;
         calculateAbsolutePosition(t_robot_pose);
 
         // calculate angle
@@ -99,22 +95,22 @@ void Person::updateState(const body_tracker_msgs::Skeleton& t_skeleton, const ge
 
 void Person::calculateAbsolutePosition(const geometry_msgs::PoseStamped& t_robot_pose)
 {
-    if (m_skeleton.centerOfMass.x > 0) {
-        auto robot_angle{yawFromPose(t_robot_pose)};
+    // if (m_skeleton.centerOfMass.x > 0) {
+    //     auto robot_angle{yawFromPose(t_robot_pose)};
 
-        auto rotation{tf::Matrix3x3{
-                cos(robot_angle), -sin(robot_angle), t_robot_pose.pose.position.x,
-                sin(robot_angle), cos(robot_angle), t_robot_pose.pose.position.y,
-                0.0, 0.0, 1.0
-        }};
+    //     auto rotation{tf::Matrix3x3{
+    //             cos(robot_angle), -sin(robot_angle), t_robot_pose.pose.position.x,
+    //             sin(robot_angle), cos(robot_angle), t_robot_pose.pose.position.y,
+    //             0.0, 0.0, 1.0
+    //     }};
 
-        auto local_vector{tf::Vector3{(m_skeleton.centerOfMass.x / 1000), (m_skeleton.centerOfMass.y / 1000), 1.0}};
-        auto global_vector{rotation * local_vector};
+    //     auto local_vector{tf::Vector3{(m_skeleton.centerOfMass.x / 1000), (m_skeleton.centerOfMass.y / 1000), 1.0}};
+    //     auto global_vector{rotation * local_vector};
 
-        m_current_pose.header.stamp = ros::Time::now();
-        m_current_pose.pose.position.x = global_vector.x();
-        m_current_pose.pose.position.y = global_vector.y();
-    }
+    //     m_current_pose.header.stamp = ros::Time::now();
+    //     m_current_pose.pose.position.x = global_vector.x();
+    //     m_current_pose.pose.position.y = global_vector.y();
+    // }
 }
 
 
@@ -204,10 +200,4 @@ void Person::applyMovingAverageFilter(const double t_interval_length_sec)
 
     if (m_mean_mean_velocities.size() > 200)
         m_mean_mean_velocities.pop_front();
-}
-
-
-bool Person::correctHandHeight() const
-{
-    return m_skeleton.joint_position_left_hand.z > m_skeleton.joint_position_spine_top.z;
 }

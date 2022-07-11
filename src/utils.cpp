@@ -4,8 +4,8 @@
 #include <map>
 #include <sstream>
 
-#include "../include/utils.hpp"
-#include "../include/pedestrian.hpp"
+#include "predictive_proxemics_navigation/utils.h"
+#include "predictive_proxemics_navigation/pedestrian.h"
 
 
 double Utils::proxemicsFunction(double t_a, double t_x, double t_sigma, double t_d_min)

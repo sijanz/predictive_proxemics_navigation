@@ -3,11 +3,11 @@
 #include <map>
 #include <vector>
 #include <deque>
-#include "pedestrian.hpp"
-#include "utils.hpp"
-#include "navigation_algorithm.hpp"
-#include "group_detector.hpp"
-#include "astar.hpp"
+#include "pedestrian.h"
+#include "utils.h"
+#include "navigation_algorithm.h"
+#include "group_detector.h"
+#include "astar.h"
 
 
 enum NAVIGATION_MODE
@@ -24,7 +24,7 @@ public:
 
     void noGlobalPlanner();
 
-    void sense(const Utils::AgentState& t_robot_state, const std::vector<Utils::AgentState>& t_pedestrian_states, float t_sim_time);
+    void sense();
     void plan();
     std::vector<float> act();
 

@@ -1,5 +1,5 @@
-#include "../include/pedestrian.hpp"
-#include "../include/utils.hpp"
+#include "predictive_proxemics_navigation/pedestrian.h"
+#include "predictive_proxemics_navigation/utils.h"
 
 Pedestrian::Pedestrian(int t_id)
 {

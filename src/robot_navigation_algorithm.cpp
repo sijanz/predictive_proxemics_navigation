@@ -1,6 +1,6 @@
 #include <fstream>
 #include <algorithm>
-#include "../include/robot_navigation_algorithm.hpp"
+#include "predictive_proxemics_navigation/robot_navigation_algorithm.h"
 
 
 RobotNavigationAlgorithm::RobotNavigationAlgorithm() : m_group_detector{GroupDetector{}}
@@ -54,62 +54,62 @@ RobotNavigationAlgorithm::RobotNavigationAlgorithm(float t_time_step, float t_ma
 }
 
 
-void RobotNavigationAlgorithm::sense(const Utils::AgentState& t_robot_state, const std::vector<Utils::AgentState>& t_pedestrian_states, float t_sim_time)
+void RobotNavigationAlgorithm::sense()
 {
-	m_sim_time = t_sim_time;
+	// m_sim_time = t_sim_time;
 
-	if (!m_inital_path_set && !m_no_global_planner) {
-		applyGlobalPlanner();
-		m_inital_path_set = true;
-	}
+	// if (!m_inital_path_set && !m_no_global_planner) {
+	// 	applyGlobalPlanner();
+	// 	m_inital_path_set = true;
+	// }
 
-	// DEBUG
-	if (m_debug) {
-		std::cout << "sim time: " << t_sim_time << std::endl;
-		std::cout << "receiving robot state: " << Point3f{t_robot_state.x, t_robot_state.y, 0.0} << std::endl;
-	}
+	// // DEBUG
+	// if (m_debug) {
+	// 	std::cout << "sim time: " << t_sim_time << std::endl;
+	// 	std::cout << "receiving robot state: " << Point3f{t_robot_state.x, t_robot_state.y, 0.0} << std::endl;
+	// }
 
-	// set own position
-	if (t_robot_state.x != 0.0 && t_robot_state.y != 0.0)
-		m_own_positions.emplace_back(Point3f{t_robot_state.x, t_robot_state.y, 0.0});
+	// // set own position
+	// if (t_robot_state.x != 0.0 && t_robot_state.y != 0.0)
+	// 	m_own_positions.emplace_back(Point3f{t_robot_state.x, t_robot_state.y, 0.0});
 
-	if (m_own_positions.size() >= 10)
-		m_own_positions.pop_front();
+	// if (m_own_positions.size() >= 10)
+	// 	m_own_positions.pop_front();
 
 	
-	for (const auto& pedestrian : t_pedestrian_states) {
+	// for (const auto& pedestrian : t_pedestrian_states) {
 
-		bool found{false};
-		for (auto& sensed : m_sensed_positions) {
-			if (pedestrian.name == sensed.first) {
-				found = true;
-				sensed.second.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
-			}
-		}
+	// 	bool found{false};
+	// 	for (auto& sensed : m_sensed_positions) {
+	// 		if (pedestrian.name == sensed.first) {
+	// 			found = true;
+	// 			sensed.second.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
+	// 		}
+	// 	}
 
-		if (!found) {
-			std::deque<Point3f> deque{};
-			deque.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
-			m_sensed_positions.emplace_back(std::make_pair(pedestrian.name, deque));
-		}
-	}
+	// 	if (!found) {
+	// 		std::deque<Point3f> deque{};
+	// 		deque.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
+	// 		m_sensed_positions.emplace_back(std::make_pair(pedestrian.name, deque));
+	// 	}
+	// }
 
-	int i{0};
-	for (const auto& sensed : m_sensed_positions) {
-		bool found{false};
-		for (const auto& pedestrian : t_pedestrian_states) {
-			if (pedestrian.name == sensed.first) {
-				found = true;
-				break;
-			}
-		}
+	// int i{0};
+	// for (const auto& sensed : m_sensed_positions) {
+	// 	bool found{false};
+	// 	for (const auto& pedestrian : t_pedestrian_states) {
+	// 		if (pedestrian.name == sensed.first) {
+	// 			found = true;
+	// 			break;
+	// 		}
+	// 	}
 
-		if (!found) {
-			m_sensed_positions.erase(m_sensed_positions.begin() + i);
-			continue;
-		}
-		++i;
-	}
+	// 	if (!found) {
+	// 		m_sensed_positions.erase(m_sensed_positions.begin() + i);
+	// 		continue;
+	// 	}
+	// 	++i;
+	// }
 
 	/*
 	// set positions of pedestrians

@@ -36,7 +36,7 @@
 #include <ros/ros.h>
 #include <tf/LinearMath/Matrix3x3.h>
 
-#include "robust_people_follower/status_module.h"
+#include "predictive_proxemics_navigation/status_module.h"
 
 
 void StatusModule::printInfo() const

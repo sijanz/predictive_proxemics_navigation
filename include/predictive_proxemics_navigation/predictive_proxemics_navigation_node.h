@@ -40,7 +40,6 @@
 
 #include <ros/ros.h>
 #include <kobuki_msgs/BumperEvent.h>
-#include <body_tracker_msgs/Skeleton.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
@@ -50,7 +49,7 @@
 #include "tracking_module.h"
 #include "control_module.h"
 #include "recovery_module.h"
-#include "robot_navigation_algorithm.hpp"
+#include "robot_navigation_algorithm.h"
 
 
 /**
@@ -284,6 +283,3 @@ private:
      */
     visualization_msgs::Marker predictionRadiusMarker() const;
 };
-
-
-#endif //ROBUST_PEOPLE_FOLLOWER_ROBUST_PEOPLE_FOLLOWER_NODE_H

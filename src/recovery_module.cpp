@@ -36,8 +36,8 @@
 #include <geometry_msgs/PointStamped.h>
 #include <angles/angles.h>
 
-#include "robust_people_follower/recovery_module.h"
-#include "robust_people_follower/status_module.h"
+#include "predictive_proxemics_navigation/recovery_module.h"
+#include "predictive_proxemics_navigation/status_module.h"
 
 
 void RecoveryModule::predictTargetPosition(const Person& t_target, const double t_interval_sec)
@@ -158,7 +158,7 @@ void RecoveryModule::reIdentify(Person& t_target, const std::shared_ptr<std::vec
                 m_old_predicted_target_position = geometry_msgs::Point32{};
                 m_predicted_target_position = geometry_msgs::Point32{};
                 m_prediction_radius = 0.0;
-                p.target() = true;
+                // p.target() = true;
                 t_target = p;
                 t_status = StatusModule::Status::FOLLOWING;
             }

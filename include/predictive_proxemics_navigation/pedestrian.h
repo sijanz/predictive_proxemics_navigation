@@ -1,7 +1,7 @@
 #pragma once
 
-#include "agent.hpp"
-#include "utils.hpp"
+#include "agent.h"
+#include "utils.h"
 
 class Pedestrian : public Agent
 {

@@ -119,7 +119,7 @@ private:
     std::shared_ptr<std::vector<Person>> m_tracked_persons{};
 
 
-    static bool checkForValidData(const body_tracker_msgs::Skeleton& t_skeleton);
+    // static bool checkForValidData(const body_tracker_msgs::Skeleton& t_skeleton);
 };
 
 
