@@ -37,6 +37,7 @@
 #define ROBUST_PEOPLE_FOLLOWER_STATUS_MODULE_H
 
 #include "object_2d_space.h"
+#include <vecmath.h>
 
 
 /**
@@ -113,6 +114,8 @@ public:
      */
     inline const StatusModule::Status status() const { return m_status; }
 
+    inline const Point3f robotPosition() const { return m_robot_position; }
+
 
     /*
      * ********** STANDARD METHODS **********
@@ -131,6 +134,8 @@ private:
 
     /** @brief Stores the current status of the robot in form of the Status enumeration. */
     Status m_status{};
+
+    Point3f m_robot_position{};
 };
 
 

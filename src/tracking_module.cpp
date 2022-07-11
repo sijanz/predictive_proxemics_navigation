@@ -43,7 +43,7 @@ TrackingModule::TrackingModule()
     m_tracked_persons = std::make_shared<std::vector<Person>>();
 }
 
-
+// TODO: function that handles the callback for pedestrian data
 // void TrackingModule::processSkeletonData(const body_tracker_msgs::Skeleton& t_skeleton,
 //                                          const geometry_msgs::PoseStamped& t_robot_pose, StatusModule::Status& t_status)
 // {

@@ -99,8 +99,7 @@ public:
      * @param t_follow_threshold the distance at which the target is being followed
      * @return the velocity command to be published in ROS; includes linear and angular velocity information
      */
-    geometry_msgs::Twist velocityCommand(StatusModule::Status& t_status, const geometry_msgs::PoseStamped& t_pose,
-                                         const Person& t_target, double t_follow_threshold);
+    geometry_msgs::Twist velocityCommand(const geometry_msgs::PoseStamped& t_pose, const Point3f& t_current_waypoint);
 
 
     /**

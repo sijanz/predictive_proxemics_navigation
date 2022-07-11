@@ -24,9 +24,9 @@ public:
 
     void noGlobalPlanner();
 
-    void sense();
+    void sense(const Point3f& t_robot_position, const std::vector<Point3f>& t_pedestrian_positions);
     void plan();
-    std::vector<float> act();
+    Point3f act();
 
     inline const bool mapTraversibleReadIn() const { return m_map_traversible_read_in; }
 

@@ -54,30 +54,22 @@ RobotNavigationAlgorithm::RobotNavigationAlgorithm(float t_time_step, float t_ma
 }
 
 
-void RobotNavigationAlgorithm::sense()
+void RobotNavigationAlgorithm::sense(const Point3f& t_robot_position, const std::vector<Point3f>& t_pedestrian_positions)
 {
-	// m_sim_time = t_sim_time;
 
-	// if (!m_inital_path_set && !m_no_global_planner) {
-	// 	applyGlobalPlanner();
-	// 	m_inital_path_set = true;
-	// }
+	if (!m_inital_path_set && !m_no_global_planner) {
+		applyGlobalPlanner();
+		m_inital_path_set = true;
+	}
 
-	// // DEBUG
-	// if (m_debug) {
-	// 	std::cout << "sim time: " << t_sim_time << std::endl;
-	// 	std::cout << "receiving robot state: " << Point3f{t_robot_state.x, t_robot_state.y, 0.0} << std::endl;
-	// }
+	// set own position
+	m_own_positions.emplace_back(t_robot_position);
 
-	// // set own position
-	// if (t_robot_state.x != 0.0 && t_robot_state.y != 0.0)
-	// 	m_own_positions.emplace_back(Point3f{t_robot_state.x, t_robot_state.y, 0.0});
+	if (m_own_positions.size() >= 10)
+		m_own_positions.pop_front();
 
-	// if (m_own_positions.size() >= 10)
-	// 	m_own_positions.pop_front();
-
-	
-	// for (const auto& pedestrian : t_pedestrian_states) {
+	// TODO: store pedestrian positions	
+	// for (const auto& pedestrian : t_pedestrian_positions) {
 
 	// 	bool found{false};
 	// 	for (auto& sensed : m_sensed_positions) {
@@ -110,20 +102,6 @@ void RobotNavigationAlgorithm::sense()
 	// 	}
 	// 	++i;
 	// }
-
-	/*
-	// set positions of pedestrians
-	for (int i{0}; i < t_pedestrian_states.size(); ++i) {
-
-		if (m_sensed_positions.at(i).size() >= 10)
-			m_sensed_positions.at(i).pop_front();
-
-		m_sensed_positions.at(i).emplace_back(m_agents->at(i + 1).position());
-	}
-	*/
-
-	// 'sense' walls
-	// m_laser_scanner_data_points = Utils::createLaserScannerDataPoints(m_current_robot_position, m_current_robot_heading, *m_walls);
 }
 
 
@@ -728,29 +706,30 @@ void RobotNavigationAlgorithm::plan()
 }
 
 
-std::vector<float> RobotNavigationAlgorithm::act()
+Point3f RobotNavigationAlgorithm::act()
 {
-	if (!m_waypoints.empty()) {
+	return m_waypoints.at(0);
+	// if (!m_waypoints.empty()) {
 		
-		// compute social force
-		Vector3f acceleration{drivingForce()};
+	// 	// compute social force
+	// 	Vector3f acceleration{drivingForce()};
 
-		// compute new velocity
-		m_velocity_vector = m_velocity_vector + acceleration * m_time_step;
+	// 	// compute new velocity
+	// 	m_velocity_vector = m_velocity_vector + acceleration * m_time_step;
 
-		// truncate velocity if it exceeds maximum speed
-		if (m_velocity_vector.lengthSquared() > (m_desired_speed * m_desired_speed)) {
-			m_velocity_vector.normalize();
-			m_velocity_vector *= m_desired_speed;
-		}
+	// 	// truncate velocity if it exceeds maximum speed
+	// 	if (m_velocity_vector.lengthSquared() > (m_desired_speed * m_desired_speed)) {
+	// 		m_velocity_vector.normalize();
+	// 		m_velocity_vector *= m_desired_speed;
+	// 	}
 
-		// compute new position
-		Point3f new_position{m_own_positions.at(m_own_positions.size() - 1) + m_velocity_vector * m_time_step};
+	// 	// compute new position
+	// 	Point3f new_position{m_own_positions.at(m_own_positions.size() - 1) + m_velocity_vector * m_time_step};
 
-		return std::vector<float>{new_position.x, new_position.y, (float)m_current_robot_heading, m_desired_speed};
-	}
+	// 	return std::vector<float>{new_position.x, new_position.y, (float)m_current_robot_heading, m_desired_speed};
+	// }
 
-	return std::vector<float>{m_goal.x, m_goal.y, (float)m_current_robot_heading, m_desired_speed};
+	// return std::vector<float>{m_goal.x, m_goal.y, (float)m_current_robot_heading, m_desired_speed};
 }
 
 

@@ -43,7 +43,7 @@
 
 
 PredictiveProxemicsNavigation::PredictiveProxemicsNavigation(const std::string& t_name)
-        : m_emergency_stop{false}, m_status_module{}, m_tracking_module{}, m_control_module{}, m_recovery_module{}
+        : m_emergency_stop{false}, m_status_module{}, m_tracking_module{}, m_control_module{}
 {
     m_name = t_name;
 
@@ -51,12 +51,13 @@ PredictiveProxemicsNavigation::PredictiveProxemicsNavigation(const std::string& 
     m_odom_sub = m_nh.subscribe("/odom", 10, &PredictiveProxemicsNavigation::odometryCallback, this);
 
     // TODO: position callback
+    // TODO: get starting point
+    // TODO: get goal point
 
     m_velocity_command_pub = m_nh.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1000);
     m_visualization_pub = m_nh.advertise<visualization_msgs::Marker>("robust_people_follower/markers", 10);
 
-    // TODO: get starting point
-    // TODO: get goal point
+
     
     std::vector<std::vector<int>> traversible{};
     Point3f robot_start{};
@@ -94,10 +95,9 @@ void PredictiveProxemicsNavigation::runLoop()
 
         processCallbacks();
 
-        m_navigation_algorithm.sense();
+        m_navigation_algorithm.sense(m_status_module.robotPosition(), m_tracking_module.trackedPedestrians());
         m_navigation_algorithm.plan();
-        m_navigation_algorithm.act();
-
+        m_velocity_command_pub.publish(m_control_module.velocityCommand(m_status_module.pose(), m_navigation_algorithm.act()));
         /*
         // check the robot's status
         switch (m_status_module.status()) {
@@ -203,6 +203,8 @@ void PredictiveProxemicsNavigation::odometryCallback(const nav_msgs::Odometry::C
     // process data
     m_status_module.processOdometryData(pose_stamped);
 }
+
+// TODO: callback for pedestrian data
 
 
 // TODO: reimplement
@@ -339,7 +341,7 @@ void PredictiveProxemicsNavigation::publishWaypoints() const
  */
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "robust_people_follower");
+    ros::init(argc, argv, "predictive_proxemics_navigation");
     PredictiveProxemicsNavigation predictive_proxemics_navigation{ros::this_node::getName()};
     predictive_proxemics_navigation.runLoop();
     return 0;

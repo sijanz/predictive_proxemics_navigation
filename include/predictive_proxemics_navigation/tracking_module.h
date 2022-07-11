@@ -37,6 +37,7 @@
 #define ROBUST_PEOPLE_FOLLOWER_TRACKING_MODULE_H
 
 
+#include <vecmath.h>
 #include "person.h"
 
 
@@ -84,6 +85,8 @@ public:
      */
     inline const std::shared_ptr<std::vector<Person>> trackedPersons() const { return m_tracked_persons; }
 
+    inline const std::vector<Point3f> trackedPedestrians() const { return m_tracked_pedestrians; }
+
 
     /*
      * ********** STANDARD METHODS **********
@@ -117,6 +120,8 @@ private:
 
     /** @brief A list persons currently tracked  */
     std::shared_ptr<std::vector<Person>> m_tracked_persons{};
+
+    std::vector<Point3f> m_tracked_pedestrians{};
 
 
     // static bool checkForValidData(const body_tracker_msgs::Skeleton& t_skeleton);

@@ -67,16 +67,14 @@ void ControlModule::addNewWaypoint(const geometry_msgs::PoseStamped& t_target_po
 }
 
 
-geometry_msgs::Twist ControlModule::velocityCommand(StatusModule::Status& t_status,
-                                                    const geometry_msgs::PoseStamped& t_pose,
-                                                    const Person& t_target, const double t_follow_threshold)
+geometry_msgs::Twist ControlModule::velocityCommand(const geometry_msgs::PoseStamped& t_pose, const Point3f& t_current_waypoint)
 {
 
     // target is above threshold, follow him using waypoints
 
     auto speed{geometry_msgs::Twist{}};
 
-    auto current_goal{m_waypoint_list->at(0)};
+    // auto current_goal{m_waypoint_list->at(0)};
 
     auto theta{Object2DSpace::yawFromPose(t_pose)};
 
@@ -86,13 +84,13 @@ geometry_msgs::Twist ControlModule::velocityCommand(StatusModule::Status& t_stat
             0.0, 0.0, 1.0
     }};
 
-    auto global_vector{tf::Vector3{current_goal.point.x, current_goal.point.y, 1.0}};
+    auto global_vector{tf::Vector3{t_current_waypoint.x, t_current_waypoint.y, 1.0}};
     auto local_vector{rotation.inverse() * global_vector};
 
     auto local_angle_to_goal{atan2(local_vector.y(), local_vector.x())};
 
-    auto distance_to_goal{sqrt(pow(current_goal.point.x - t_pose.pose.position.x, 2) +
-                                pow(current_goal.point.y - t_pose.pose.position.y, 2))};
+    auto distance_to_goal{sqrt(pow(t_current_waypoint.x - t_pose.pose.position.x, 2) +
+                                pow(t_current_waypoint.y - t_pose.pose.position.y, 2))};
 
     auto speed_linear{0.6};
 

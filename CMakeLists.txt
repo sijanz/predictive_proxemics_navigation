@@ -141,7 +141,6 @@ add_executable(${PROJECT_NAME}_node
         src/status_module.cpp
         src/tracking_module.cpp
         src/control_module.cpp
-        src/recovery_module.cpp
         src/agent.cpp
         src/astar.cpp
         src/group_detector.cpp

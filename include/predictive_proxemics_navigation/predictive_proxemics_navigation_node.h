@@ -48,7 +48,6 @@
 #include "status_module.h"
 #include "tracking_module.h"
 #include "control_module.h"
-#include "recovery_module.h"
 #include "robot_navigation_algorithm.h"
 
 
@@ -206,10 +205,6 @@ private:
     /** @brief Instance of the Control Module. Calculates the robot's velocity messages. See control_module.h for
      * detailed documentation. */
     ControlModule m_control_module{};
-
-    /** @brief Instance of the Recovery Module. Predicts the target's position if the line of sight is lost and
-     * re-identifies the target. See recovery_module.h for detailed documentation. */
-    RecoveryModule m_recovery_module{};
 
 
     /*
