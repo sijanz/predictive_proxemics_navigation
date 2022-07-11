@@ -63,13 +63,6 @@ public:
      * ********** SETTERS **********
      */
 
-    /**
-     * @brief Setter for the current target.
-     *
-     * @return a reference to the target as a lvalue
-     */
-    inline Person& target() { return m_target; }
-
 
     /**
      * @brief Setter for the list of tracked persons.
@@ -82,13 +75,6 @@ public:
     /*
      * ********** GETTERS **********
      */
-
-    /**
-     * @brief Getter for the current target.
-     *
-     * @return a reference to the target as a rvalue
-     */
-    inline const Person& target() const { return m_target; }
 
 
     /**
@@ -114,13 +100,10 @@ public:
      * @param t_robot_pose the pose information of the robot; used to calculate the absolute position of a person
      * @param t_status reference to the robot's status; needs to be changed if a new target is selected
      */
-    void processSkeletonData(const body_tracker_msgs::Skeleton& t_skeleton,
-                             const geometry_msgs::PoseStamped& t_robot_pose,
-                             StatusModule::Status& t_status);
-
-
-    // TODO: comment
-    void checkForTargetLoss(StatusModule::Status& t_status);
+    // TODO: processPersonData
+    // void processSkeletonData(const body_tracker_msgs::Skeleton& t_skeleton,
+    //                          const geometry_msgs::PoseStamped& t_robot_pose,
+    //                          StatusModule::Status& t_status);
 
 
     /**
@@ -131,9 +114,6 @@ public:
 
 
 private:
-
-    /** @brief Represents the current target */
-    Person m_target{};
 
     /** @brief A list persons currently tracked  */
     std::shared_ptr<std::vector<Person>> m_tracked_persons{};

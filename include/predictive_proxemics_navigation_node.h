@@ -33,8 +33,7 @@
 *********************************************************************/
 
 
-#ifndef ROBUST_PEOPLE_FOLLOWER_ROBUST_PEOPLE_FOLLOWER_NODE_H
-#define ROBUST_PEOPLE_FOLLOWER_ROBUST_PEOPLE_FOLLOWER_NODE_H
+#pragma once
 
 
 #include <deque>
@@ -51,6 +50,7 @@
 #include "tracking_module.h"
 #include "control_module.h"
 #include "recovery_module.h"
+#include "robot_navigation_algorithm.hpp"
 
 
 /**
@@ -58,7 +58,7 @@
  * publishers. In addition to the ROS interface, important constants like the loop function are defined here. The node's
  * main loop is also defined in this class.
  */
-class RobustPeopleFollower
+class PredictiveProxemicsNavigation
 {
 public:
 
@@ -75,14 +75,14 @@ public:
      *
      * @param t_name the name of the node as indicated in ROS
      */
-    explicit RobustPeopleFollower(const std::string& t_name);
+    explicit PredictiveProxemicsNavigation(const std::string& t_name);
 
 
     /**
      * @brief Destructor for a RobustPeopleFollower object. Shuts down the subscribers and publishers and prints out a
      * message that indicates the shutdown.
      */
-    ~RobustPeopleFollower();
+    ~PredictiveProxemicsNavigation();
 
 
     /*
@@ -110,7 +110,9 @@ public:
      *
      * @param msg a pointer to the message received from the "body_tracker/skeleton"-topic
      */
-    void skeletonCallback(const body_tracker_msgs::Skeleton::ConstPtr& msg);
+    //void skeletonCallback(const body_tracker_msgs::Skeleton::ConstPtr& msg);
+
+    // TODO: lidar callback
 
 
     /*
@@ -139,10 +141,10 @@ private:
     static constexpr double LOOP_FREQUENCY{10.0};
 
     /** @brief The distance threshold after that the target is being followed (in mm). */
-    static constexpr double FOLLOW_THRESHOLD{1800};
+    // static constexpr double FOLLOW_THRESHOLD{1800};
 
     /** @brief The time period to re-identify the target. */
-    static constexpr int SEARCH_TIMEOUT{10};
+    // static constexpr int SEARCH_TIMEOUT{10};
 
     /** @brief The factor of the length of a person's vector. */
     static constexpr double VECTOR_LENGTH_FACTOR{1.5};
@@ -154,6 +156,8 @@ private:
 
     /** @brief The name of the node as represented in ROS. */
     std::string m_name{};
+
+    RobotNavigationAlgorithm m_navigation_algorithm{};
 
     /** @brief The ROS node handle. Is used to subscribe and publish to ROS topics. */
     ros::NodeHandle m_nh{};

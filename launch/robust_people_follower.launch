@@ -1,7 +1,6 @@
 <launch>
 
-    <!-- provides the skeleton information from tracked persons -->
-    <node name="astra_body_tracker" pkg="astra_body_tracker" type="astra_body_tracker_node"/>
+    <!-- TODO: launch lidar node-->
 
-    <node name="robust_people_follower" pkg="robust_people_follower" type="robust_people_follower_node" output="screen"/>
+    <node name="predictive_proxemics_navigation" pkg="predictive_proxemics_navigation" type="predictive_proxemics_navigation_node" output="screen"/>
 </launch>

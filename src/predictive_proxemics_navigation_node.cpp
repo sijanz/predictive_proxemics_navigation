@@ -39,10 +39,10 @@
 #include <chrono>
 #include <ctime>
 
-#include "robust_people_follower/robust_people_follower_node.h"
+#include "../include/predictive_proxemics_navigation_node.h"
 
 
-RobustPeopleFollower::RobustPeopleFollower(const std::string& t_name)
+PredictiveProxemicsNavigation::PredictiveProxemicsNavigation(const std::string& t_name)
         : m_emergency_stop{false}, m_status_module{}, m_tracking_module{}, m_control_module{}, m_recovery_module{}
 {
     m_name = t_name;
@@ -53,10 +53,15 @@ RobustPeopleFollower::RobustPeopleFollower(const std::string& t_name)
 
     m_velocity_command_pub = m_nh.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1000);
     m_visualization_pub = m_nh.advertise<visualization_msgs::Marker>("robust_people_follower/markers", 10);
+
+    // TODO: get starting point
+    // TODO: get goal point
+
+    m_navigation_algorithm = RobotNavigationAlgorithm{0.05, 1.2, ep.get_environment().building_traversible, robot_start, robot_goal};
 }
 
 
-RobustPeopleFollower::~RobustPeopleFollower()
+PredictiveProxemicsNavigation::~PredictiveProxemicsNavigation()
 {
     ROS_INFO_STREAM(m_name << " shutting down");
 
@@ -68,7 +73,7 @@ RobustPeopleFollower::~RobustPeopleFollower()
 }
 
 
-void RobustPeopleFollower::runLoop()
+void PredictiveProxemicsNavigation::runLoop()
 {
     auto loop_rate{ros::Rate{LOOP_FREQUENCY}};
 
@@ -80,10 +85,15 @@ void RobustPeopleFollower::runLoop()
 
     while (ros::ok()) {
 
-        auto start{std::chrono::system_clock::now()};
+        // auto start{std::chrono::system_clock::now()};
 
         processCallbacks();
 
+        m_navigation_algorithm.sense();
+        m_navigation_algorithm.plan();
+        m_navigation_algorithm.act();
+
+        /*
         // check the robot's status
         switch (m_status_module.status()) {
             case StatusModule::Status::FOLLOWING:
@@ -98,17 +108,18 @@ void RobustPeopleFollower::runLoop()
             default:
                 break;
         }
+        */
 
-        // publish markers to view in RViz
-        publishPersonMarkers();
-        publishWaypoints();
+        // TODO: publish markers to view in RViz
+        // publishPersonMarkers();
+        // publishWaypoints();
 
-        auto end{std::chrono::system_clock::now()};
+        // auto end{std::chrono::system_clock::now()};
 
-        std::chrono::duration<double> elapsed_time{end - start};
+        // std::chrono::duration<double> elapsed_time{end - start};
 
         // print out program information on the screen
-        debugPrintout();
+        // debugPrintout();
 
         // LOG
 //        auto current_time{ros::Time::now().toSec() - start_time};
@@ -134,7 +145,7 @@ void RobustPeopleFollower::runLoop()
 }
 
 
-void RobustPeopleFollower::processCallbacks()
+void PredictiveProxemicsNavigation::processCallbacks()
 {
     ros::spinOnce();
 
@@ -146,13 +157,13 @@ void RobustPeopleFollower::processCallbacks()
         m_velocity_command_pub.publish(geometry_msgs::Twist{});
 
         // reset target information
-        m_tracking_module.target() = Person{};
+        // m_tracking_module.target() = Person{};
 
         m_emergency_stop = false;
     }
 
     // check if a target is lost
-    m_tracking_module.checkForTargetLoss(m_status_module.status());
+    // m_tracking_module.checkForTargetLoss(m_status_module.status());
 
     // reset flags to only process data once in a loop iteration
     m_status_module.valuesSet() = false;
@@ -162,27 +173,16 @@ void RobustPeopleFollower::processCallbacks()
 }
 
 
-void RobustPeopleFollower::debugPrintout() const
+void PredictiveProxemicsNavigation::debugPrintout() const
 {
 //    system("clear");
     ROS_INFO_STREAM("\n");
 
     ROS_INFO_STREAM("ROS time: " << ros::Time::now().sec);
     m_status_module.printInfo();
-
-    if (m_status_module.status() != StatusModule::Status::WAITING) {
-        ROS_INFO_STREAM("target information:");
-        m_tracking_module.target().printVerboseInfo();
-
-        ROS_INFO_STREAM("goal list size: " << m_control_module.waypoints()->size());
-    }
-
-    ROS_INFO_STREAM("tracked persons: " << m_tracking_module.trackedPersons()->size());
-    for (const auto& p : *m_tracking_module.trackedPersons())
-        p.printInfo();
 }
 
-void RobustPeopleFollower::followTarget()
+void PredictiveProxemicsNavigation::followTarget()
 {
     m_velocity_command_pub.publish(m_control_module.velocityCommand(m_status_module.status(),
                                                                     m_status_module.pose(),
@@ -190,72 +190,14 @@ void RobustPeopleFollower::followTarget()
 }
 
 
-void RobustPeopleFollower::searchForTarget()
-{
-    if (m_tracking_module.target().lastSeen() < SEARCH_TIMEOUT) {
-
-        // predict the target's position according to the CTRA model
-        m_recovery_module.predictTargetPosition(m_tracking_module.target(), 1.0);
-
-        // look at the predicted position if the last waypoint is reached
-        if (m_control_module.waypoints()->empty()) {
-            m_status_module.status() = StatusModule::Status::SEARCHING;
-            m_velocity_command_pub.publish(ControlModule::velocityCommand(m_status_module.pose(),
-                                                                          m_recovery_module.predictedTargetPosition()));
-
-            // replicate the target's path
-        } else
-            m_velocity_command_pub.publish(m_control_module.velocityCommand(m_status_module.status(),
-                                                                            m_status_module.pose(),
-                                                                            m_tracking_module.target(),
-                                                                            FOLLOW_THRESHOLD));
-
-
-        // TODO: move to recovery module
-        auto theta{Object2DSpace::yawFromPose(m_status_module.pose())};
-
-        auto rotation{tf::Matrix3x3{
-                cos(theta), -sin(theta), m_status_module.pose().pose.position.x,
-                sin(theta), cos(theta), m_status_module.pose().pose.position.y,
-                0.0, 0.0, 1.0
-        }};
-
-        auto global_vector{tf::Vector3{m_recovery_module.predictedTargetPosition().x,
-                                       m_recovery_module.predictedTargetPosition().y, 1.0}};
-        auto local_vector{rotation.inverse() * global_vector};
-
-        auto local_angle_to_goal{atan2(local_vector.y(), local_vector.x())};
-
-        // DEBUG
-        ROS_INFO_STREAM("angle to predicted position: " << local_angle_to_goal);
-
-        // re-identify the target if possible
-        if (m_tracking_module.target().lastSeen() > 0.2 && m_tracking_module.target().lastSeen() < 10.0
-            && std::abs(local_angle_to_goal) < 0.3)
-            m_recovery_module.reIdentify(m_tracking_module.target(), m_tracking_module.trackedPersons(),
-                                         m_control_module.waypoints(), m_status_module.status());
-
-        // publish prediction markers
-        m_visualization_pub.publish(lastPositionMarker());
-        m_visualization_pub.publish(predictedPositionMarker());
-        m_visualization_pub.publish(predictionRadiusMarker());
-
-        // reset the robot's status to WAITING if the target is lost for more than 10 seconds
-    } else {
-        m_tracking_module.target() = Person{};
-        m_status_module.status() = StatusModule::Status::WAITING;
-    }
-}
-
-
-void RobustPeopleFollower::bumperCallback(const kobuki_msgs::BumperEventConstPtr& msg)
+void PredictiveProxemicsNavigation::bumperCallback(const kobuki_msgs::BumperEventConstPtr& msg)
 {
     if (msg->state == kobuki_msgs::BumperEvent::PRESSED)
         m_emergency_stop = true;
 }
 
 
-void RobustPeopleFollower::odometryCallback(const nav_msgs::Odometry::ConstPtr& msg)
+void PredictiveProxemicsNavigation::odometryCallback(const nav_msgs::Odometry::ConstPtr& msg)
 {
     // save data from message
     auto pose_stamped{geometry_msgs::PoseStamped{}};
@@ -267,34 +209,7 @@ void RobustPeopleFollower::odometryCallback(const nav_msgs::Odometry::ConstPtr& 
 }
 
 
-void RobustPeopleFollower::skeletonCallback(const body_tracker_msgs::Skeleton::ConstPtr& msg)
-{
-    // save data from message
-    auto skeleton{body_tracker_msgs::Skeleton{}};
-    skeleton.body_id = msg->body_id;
-    skeleton.tracking_status = msg->tracking_status;
-    skeleton.gesture = msg->gesture;
-    skeleton.position2D = msg->position2D;
-    skeleton.centerOfMass = msg->centerOfMass;
-    skeleton.joint_position_head = msg->joint_position_head;
-    skeleton.joint_position_neck = msg->joint_position_neck;
-    skeleton.joint_position_shoulder = msg->joint_position_shoulder;
-    skeleton.joint_position_spine_top = msg->joint_position_spine_top;
-    skeleton.joint_position_spine_mid = msg->joint_position_spine_mid;
-    skeleton.joint_position_spine_bottom = msg->joint_position_spine_bottom;
-    skeleton.joint_position_left_shoulder = msg->joint_position_left_shoulder;
-    skeleton.joint_position_left_elbow = msg->joint_position_left_elbow;
-    skeleton.joint_position_left_hand = msg->joint_position_left_hand;
-    skeleton.joint_position_right_shoulder = msg->joint_position_right_shoulder;
-    skeleton.joint_position_right_elbow = msg->joint_position_right_elbow;
-    skeleton.joint_position_right_hand = msg->joint_position_right_hand;
-
-    // process data
-    m_tracking_module.processSkeletonData(skeleton, m_status_module.pose(), m_status_module.status());
-}
-
-
-void RobustPeopleFollower::publishPersonMarkers() const
+void PredictiveProxemicsNavigation::publishPersonMarkers() const
 {
     auto person_markers{std::vector<visualization_msgs::Marker>{}};
     auto person_vectors{std::vector<visualization_msgs::Marker>{}};
@@ -376,7 +291,7 @@ void RobustPeopleFollower::publishPersonMarkers() const
 }
 
 
-void RobustPeopleFollower::publishWaypoints() const
+void PredictiveProxemicsNavigation::publishWaypoints() const
 {
     auto line_strip{visualization_msgs::Marker{}};
     auto line_list{visualization_msgs::Marker{}};
@@ -422,84 +337,13 @@ void RobustPeopleFollower::publishWaypoints() const
 }
 
 
-visualization_msgs::Marker RobustPeopleFollower::lastPositionMarker() const
-{
-    auto marker{visualization_msgs::Marker{}};
-    marker.header.frame_id = "odom";
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "last_seen";
-    marker.type = visualization_msgs::Marker::MESH_RESOURCE;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.lifetime = ros::Duration{0.3};
-    marker.pose.position.x = m_tracking_module.target().pose().pose.position.x;
-    marker.pose.position.y = m_tracking_module.target().pose().pose.position.y;
-    marker.pose.orientation.w = 1.0;
-    marker.scale.x = 1.0;
-    marker.scale.y = 1.0;
-    marker.scale.z = 1.0;
-    marker.color.a = 1.0;
-    marker.color.b = 1.0;
-    marker.mesh_resource = "package://robust_people_follower/meshes/standing.dae";
-
-    return marker;
-}
-
-
-visualization_msgs::Marker RobustPeopleFollower::predictedPositionMarker() const
-{
-    auto marker{visualization_msgs::Marker{}};
-    marker.header.frame_id = "odom";
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "estimation";
-    marker.type = visualization_msgs::Marker::MESH_RESOURCE;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.lifetime = ros::Duration{0.3};
-    marker.pose.position.x = m_recovery_module.predictedTargetPosition().x;
-    marker.pose.position.y = m_recovery_module.predictedTargetPosition().y;
-    marker.pose.orientation.w = 1.0;
-    marker.scale.x = 1.0;
-    marker.scale.y = 1.0;
-    marker.scale.z = 1.0;
-    marker.color.a = 0.5;
-    marker.color.b = 1.0;
-    marker.mesh_resource = "package://robust_people_follower/meshes/standing.dae";
-
-    return marker;
-}
-
-
-visualization_msgs::Marker RobustPeopleFollower::predictionRadiusMarker() const
-{
-    auto marker{visualization_msgs::Marker{}};
-    marker.header.frame_id = "odom";
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "radius";
-    marker.type = visualization_msgs::Marker::SPHERE;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.lifetime = ros::Duration{0.3};
-    marker.pose.position.x = m_recovery_module.predictedTargetPosition().x;
-    marker.pose.position.y = m_recovery_module.predictedTargetPosition().y;
-    marker.pose.orientation.w = 1.0;
-
-    // scales the diameter, therefore we have to take the radius times two
-    marker.scale.x = m_recovery_module.predictionRadius() * 2.0;
-    marker.scale.y = m_recovery_module.predictionRadius() * 2.0;
-
-    marker.scale.z = 0.1;
-    marker.color.a = 0.5;
-    marker.color.b = 1.0;
-
-    return marker;
-}
-
-
 /**
  * @brief Entry point for the node, runs the main loop.
  */
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "robust_people_follower");
-    RobustPeopleFollower robust_people_follower{ros::this_node::getName()};
-    robust_people_follower.runLoop();
+    PredictiveProxemicsNavigation predictive_proxemics_navigation{ros::this_node::getName()};
+    predictive_proxemics_navigation.runLoop();
     return 0;
 }

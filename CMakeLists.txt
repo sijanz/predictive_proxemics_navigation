@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(robust_people_follower)
+project(predictive_proxemics_navigation)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
@@ -138,12 +138,18 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node
-        src/robust_people_follower_node.cpp
         src/person.cpp
         src/status_module.cpp
         src/tracking_module.cpp
         src/control_module.cpp
         src/recovery_module.cpp
+        src/agent.cpp
+        src/astar.cpp
+        src/group_detector.cpp
+        src/pedestrian.cpp
+        src/predictive_proxemics_navigation_node.cpp
+        src/robot_navigation_algorithm.cpp
+        src/utils.cpp
         )
 
 ## Rename C++ executable without prefix
