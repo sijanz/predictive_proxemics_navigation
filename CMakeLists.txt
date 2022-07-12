@@ -8,6 +8,8 @@ add_compile_options(-std=c++14)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+        pcl_conversions
+        pcl_ros
         geometry_msgs
         roscpp
         rospy

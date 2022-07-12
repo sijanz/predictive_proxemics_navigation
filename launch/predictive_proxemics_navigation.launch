@@ -2,5 +2,10 @@
 
     <!-- TODO: launch lidar node-->
 
-    <node name="predictive_proxemics_navigation" pkg="predictive_proxemics_navigation" type="predictive_proxemics_navigation_node" output="screen"/>
+    <node name="predictive_proxemics_navigation" pkg="predictive_proxemics_navigation" type="predictive_proxemics_navigation_node" output="screen">
+        <param name="robotStartX" value="-5.0"/>
+        <param name="robotStartY" value="0.0"/>
+        <param name="robotGoalX" value="5.0"/>
+        <param name="robotGoalY" value="5.0"/>
+    </node>
 </launch>

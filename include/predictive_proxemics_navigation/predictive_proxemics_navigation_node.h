@@ -110,7 +110,9 @@ public:
      */
     //void skeletonCallback(const body_tracker_msgs::Skeleton::ConstPtr& msg);
 
-    // TODO: lidar callback
+    void pedestrianCallback(const sensor_msgs::PointCloud2ConstPtr &input);
+
+    void mapCallback(const nav_msgs::OccupancyGrid::ConstPtr &msg);
 
 
     /*
@@ -128,6 +130,8 @@ public:
      */
     void runLoop();
 
+    ros::Publisher m_goal_pub{};
+
 
 private:
 
@@ -136,7 +140,7 @@ private:
      */
 
     /** @brief The frequency in which the main loop is running. */
-    static constexpr double LOOP_FREQUENCY{10.0};
+    static constexpr double LOOP_FREQUENCY{0.5};
 
     /** @brief The distance threshold after that the target is being followed (in mm). */
     // static constexpr double FOLLOW_THRESHOLD{1800};
@@ -160,8 +164,12 @@ private:
     /** @brief The ROS node handle. Is used to subscribe and publish to ROS topics. */
     ros::NodeHandle m_nh{};
 
+    ros::NodeHandle m_parameter_nh{};
+
     /** @brief Is set to true if the robot runs into an obstacle. */
     bool m_emergency_stop{};
+
+    bool m_map_set{false};
 
 
     /*
@@ -171,8 +179,11 @@ private:
     /** @brief Subscribes to the "/odom"-topic at a rate of 10 times per second. */
     ros::Subscriber m_odom_sub{};
 
+    ros::Subscriber m_map_sub{};
+
+    ros::Subscriber m_pedestrian_sub{};
+
     /** @brief Subscribes to the "body_tracker/skeleton"-topic at a rate of 10 times per second. */
-    ros::Subscriber m_skeleton_sub{};
 
     ros::Subscriber m_bumper_sub{};
 
@@ -188,6 +199,8 @@ private:
     /** @brief Publishes the tracked persons' vector and position to the "robust_people_follower/markers"-topic at a
      * rate of 10 times per second. */
     ros::Publisher m_visualization_pub{};
+
+
 
 
     /*

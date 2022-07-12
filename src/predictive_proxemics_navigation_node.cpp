@@ -38,30 +38,45 @@
 #include <fstream>
 #include <chrono>
 #include <ctime>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <vector>
+#include <vecmath.h>
+#include <move_base_msgs/MoveBaseAction.h>
+#include <actionlib/client/simple_action_client.h>
 
 #include "predictive_proxemics_navigation/predictive_proxemics_navigation_node.h"
 
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+
 
 PredictiveProxemicsNavigation::PredictiveProxemicsNavigation(const std::string& t_name)
-        : m_emergency_stop{false}, m_status_module{}, m_tracking_module{}, m_control_module{}
+        : m_emergency_stop{false}, m_status_module{}, m_tracking_module{}, m_parameter_nh{"~"}
 {
     m_name = t_name;
 
     m_bumper_sub = m_nh.subscribe("/mobile_base/events/bumper", 10, &PredictiveProxemicsNavigation::bumperCallback, this);
     m_odom_sub = m_nh.subscribe("/odom", 10, &PredictiveProxemicsNavigation::odometryCallback, this);
+    m_map_sub = m_nh.subscribe("/map", 10, &PredictiveProxemicsNavigation::mapCallback, this);
+    m_pedestrian_sub = m_nh.subscribe("/People_PC", 10, &PredictiveProxemicsNavigation::pedestrianCallback, this);
 
-    // TODO: position callback
-    // TODO: get starting point
-    // TODO: get goal point
+    float robot_start_x{0.0};
+    float robot_start_y{0.0};
+    float robot_goal_x{0.0};
+    float robot_goal_y{0.0};
+
+    m_parameter_nh.param("robotStartX", robot_start_x, robot_start_x);
+    m_parameter_nh.param("robotStartY", robot_start_y, robot_start_y);
+    m_parameter_nh.param("robotGoalX", robot_goal_x, robot_goal_x);
+    m_parameter_nh.param("robotGoalY", robot_goal_y, robot_goal_y);
 
     m_velocity_command_pub = m_nh.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1000);
     m_visualization_pub = m_nh.advertise<visualization_msgs::Marker>("robust_people_follower/markers", 10);
+    m_goal_pub = m_nh.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
 
-
-    
     std::vector<std::vector<int>> traversible{};
-    Point3f robot_start{};
-    Point3f robot_goal{};
+    Point3f robot_start{robot_start_x, robot_start_y, 0.0};
+    Point3f robot_goal{robot_goal_x, robot_goal_y, 0.0};
 
     m_navigation_algorithm = RobotNavigationAlgorithm{0.05, 1.2, traversible, robot_start, robot_goal};
 }
@@ -73,7 +88,8 @@ PredictiveProxemicsNavigation::~PredictiveProxemicsNavigation()
 
     m_bumper_sub.shutdown();
     m_odom_sub.shutdown();
-    m_skeleton_sub.shutdown();
+    m_map_sub.shutdown();
+    m_pedestrian_sub.shutdown();
     m_velocity_command_pub.shutdown();
     m_visualization_pub.shutdown();
 }
@@ -89,15 +105,39 @@ void PredictiveProxemicsNavigation::runLoop()
 //    file << "t,x,y,d,y_d,v,m_v,m_m_v,th,m_th,m_m_th,p_x,p_y,p_v,d_t\n";
 //    auto start_time{ros::Time::now().toSec()};
 
+    bool flag{false};
+
     while (ros::ok()) {
 
         // auto start{std::chrono::system_clock::now()};
 
         processCallbacks();
 
-        m_navigation_algorithm.sense(m_status_module.robotPosition(), m_tracking_module.trackedPedestrians());
+        m_navigation_algorithm.sense(m_status_module.robotPosition(), m_tracking_module.trackedPedestrianPositions());
         m_navigation_algorithm.plan();
-        m_velocity_command_pub.publish(m_control_module.velocityCommand(m_status_module.pose(), m_navigation_algorithm.act()));
+        Point3f waypoint{m_navigation_algorithm.act()};
+
+        if (!flag) {
+            geometry_msgs::PoseStamped pose{};
+            pose.header.frame_id = "map";
+            pose.header.stamp = ros::Time::now();
+            pose.pose.position.x = 5.0;
+            pose.pose.position.y = 5.0;
+            pose.pose.orientation.w = 1.0;
+            m_goal_pub.publish(pose);
+
+            // MoveBaseClient ac("move_base", false);
+            // ac.sendGoal(pose);
+            //flag = true;
+        }
+
+        // DEBUG
+        // std::cout << "act: waypoint: " << waypoint << std::endl;
+
+        // FIXME:
+        // m_velocity_command_pub.publish(m_control_module.velocityCommand(m_status_module.pose(), waypoint));
+
+
         /*
         // check the robot's status
         switch (m_status_module.status()) {
@@ -143,7 +183,7 @@ void PredictiveProxemicsNavigation::runLoop()
 //        }
 
         // delete entries of persons that aren't tracked anymore
-        m_tracking_module.managePersonList();
+        // m_tracking_module.managePersonList();
 
         loop_rate.sleep();
     }
@@ -156,7 +196,7 @@ void PredictiveProxemicsNavigation::processCallbacks()
 
     // do an emergency stop if the flag is set
     if (m_emergency_stop) {
-        m_status_module.status() = StatusModule::Status::WAITING;
+        // m_status_module.status() = StatusModule::Status::WAITING;
 
         // publish Twist message with values initialized to 0
         m_velocity_command_pub.publish(geometry_msgs::Twist{});
@@ -172,8 +212,8 @@ void PredictiveProxemicsNavigation::processCallbacks()
 
     // reset flags to only process data once in a loop iteration
     m_status_module.valuesSet() = false;
-    for (auto& p : *m_tracking_module.trackedPersons())
-        p.valuesSet() = false;
+    // for (auto& p : *m_tracking_module.trackedPersons())
+        // p.valuesSet() = false;
 }
 
 
@@ -204,7 +244,38 @@ void PredictiveProxemicsNavigation::odometryCallback(const nav_msgs::Odometry::C
     m_status_module.processOdometryData(pose_stamped);
 }
 
+
 // TODO: callback for pedestrian data
+void PredictiveProxemicsNavigation::pedestrianCallback(const sensor_msgs::PointCloud2ConstPtr &input)
+{
+    double ncloud = input->header.stamp.toSec();
+
+    //FIXME
+
+    pcl::PointCloud<pcl::PointXYZ> laserCloudIn;
+
+    pcl::fromROSMsg(*input, laserCloudIn);
+
+    std::vector<Point3f> pedestrian_positions{};
+
+    for (int i = 0; i < laserCloudIn.size(); i++) {
+
+        std::cout << "x = " << laserCloudIn[i].x << " , y = " << laserCloudIn[i].y << " , y = " << laserCloudIn[i].z << "\n";
+
+        pedestrian_positions.emplace_back(Point3f{laserCloudIn[i].x, laserCloudIn[i].y, 0.0});
+    }
+
+    m_tracking_module.trackedPedestrianPositions() = pedestrian_positions;
+}
+
+
+void PredictiveProxemicsNavigation::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr &msg)
+{
+    if (!m_map_set) {
+        m_navigation_algorithm.m_a_star = AStar{msg};
+        m_map_set = true;
+    }
+}
 
 
 // TODO: reimplement

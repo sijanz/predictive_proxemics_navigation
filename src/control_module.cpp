@@ -50,6 +50,14 @@ ControlModule::ControlModule() : m_current_linear{}, m_current_angular{}
 }
 
 
+ControlModule::ControlModule(const Point3f& t_start_position, const Point3f& t_goal_position) : m_current_linear{}, m_current_angular{}
+{
+    m_waypoint_list = std::make_shared<std::deque<geometry_msgs::PointStamped>>();
+    m_start_position = t_start_position;
+    m_goal_position = t_goal_position;
+}
+
+
 void ControlModule::addNewWaypoint(const geometry_msgs::PoseStamped& t_target_pose, const int t_times_per_second)
 {
     if (m_waypoint_list->size() > 100)

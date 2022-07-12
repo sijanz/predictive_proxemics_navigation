@@ -1,3 +1,16 @@
+#include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <math.h>
+#include <geometry_msgs/PointStamped.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <std_msgs/String.h>
+#include <std_msgs/UInt8.h>
+
 #include <math.h>
 #include <iostream>
 #include <fstream>
@@ -35,15 +48,12 @@ class AStar
 public:
     int startPosition_x; // In metters
     int startPosition_y; // In metters
-    int endPosition_x;   // In metters
-    int endPosition_y;   // In metters
+    int endPosition_x; // In metters
+    int endPosition_y; // In metters
 
-    //nav_msgs::OccupancyGrid::ConstPtr map;
-    std::vector<std::vector<int>> map{};
-    //int **mapArray;
-    //int **mapArrayState;
-    std::vector<std::vector<int>> mapArray_v{};
-    std::vector<std::vector<int>> mapArrayState_v{};
+    nav_msgs::OccupancyGrid::ConstPtr map;
+    int** mapArray;
+    int** mapArrayState;
     int mapTolerance = 8;
     float mapOrigin_x;
     float mapOrigin_y;
@@ -51,14 +61,14 @@ public:
     int mapWidth;
     int mapHeight;
 
-    std::vector<PointStar> pathAStar{};
-    std::vector<PointStar> pathAStarSelectedPoints{};
-    std::vector<PointStar> pathAStarDense{};
-    std::vector<PointStar> pathAStarSmoothed{};
+    std::vector<PointStar> pathAStar;
+    std::vector<PointStar> pathAStarSelectedPoints;
+    std::vector<PointStar> pathAStarDense;
+    std::vector<PointStar> pathAStarSmoothed;
 
     AStar() = default;
 
-    AStar(const std::vector<std::vector<int>>& newMap);
+    AStar(nav_msgs::OccupancyGrid::ConstPtr newMap);
 
     void getMapArray();
 

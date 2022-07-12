@@ -14,20 +14,23 @@ RobotNavigationAlgorithm::RobotNavigationAlgorithm(float t_time_step, float t_ma
 	// TODO: DEBUG
 	m_debug = true;
 
+	m_start_position = t_start;
+	m_goal_position = t_goal;
+
 	m_traversible = t_traversible;
 
 
-	for (auto& row : m_traversible) {
-		for (auto& pixel : row) {
-			if (pixel == 0) {
-				pixel = 100;
-			} else {
-				pixel = 0;
-			}
-		}
-	}
+	// for (auto& row : m_traversible) {
+	// 	for (auto& pixel : row) {
+	// 		if (pixel == 0) {
+	// 			pixel = 100;
+	// 		} else {
+	// 			pixel = 0;
+	// 		}
+	// 	}
+	// }
 
-	m_a_star = AStar(m_traversible);
+	m_a_star = AStar();
 
 
     m_time_step = t_time_step;
@@ -63,45 +66,50 @@ void RobotNavigationAlgorithm::sense(const Point3f& t_robot_position, const std:
 	}
 
 	// set own position
-	m_own_positions.emplace_back(t_robot_position);
+	m_own_positions.emplace_back(Point3f{t_robot_position.x + m_start_position.x, t_robot_position.y + m_start_position.y, 0.0});
 
 	if (m_own_positions.size() >= 10)
 		m_own_positions.pop_front();
 
 	// TODO: store pedestrian positions	
-	// for (const auto& pedestrian : t_pedestrian_positions) {
+	for (const auto& pedestrian : t_pedestrian_positions) {
 
-	// 	bool found{false};
-	// 	for (auto& sensed : m_sensed_positions) {
-	// 		if (pedestrian.name == sensed.first) {
-	// 			found = true;
-	// 			sensed.second.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
-	// 		}
-	// 	}
+		bool found{false};
+		for (auto& sensed : m_sensed_positions) {
+			if (!sensed.second.empty()) {
+				if (Utils::euclideanDistance(pedestrian, sensed.second.at(sensed.second.size() - 1)) < 0.5) {
+					found = true;
+					sensed.second.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
+				}
+			}
+		}
 
-	// 	if (!found) {
-	// 		std::deque<Point3f> deque{};
-	// 		deque.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
-	// 		m_sensed_positions.emplace_back(std::make_pair(pedestrian.name, deque));
-	// 	}
-	// }
+		if (!found) {
+			std::deque<Point3f> deque{};
+			deque.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
+			m_sensed_positions.emplace_back(std::make_pair("", deque));
+		}
+	}
 
-	// int i{0};
-	// for (const auto& sensed : m_sensed_positions) {
-	// 	bool found{false};
-	// 	for (const auto& pedestrian : t_pedestrian_states) {
-	// 		if (pedestrian.name == sensed.first) {
-	// 			found = true;
-	// 			break;
-	// 		}
-	// 	}
+	// TODO: test: delete pedestrians 
+	int i{0};
+	for (const auto& position : t_pedestrian_positions) {
+		bool found{false};
+		for (const auto& sensed : m_sensed_positions) {
+			if (!sensed.second.empty()) {
+				if (!(position.x == sensed.second.at(sensed.second.size() - 1).x && position.y == sensed.second.at(sensed.second.size() - 1).y)) {
+					found = true;
+					break;
+				}
+			}
+		}
 
-	// 	if (!found) {
-	// 		m_sensed_positions.erase(m_sensed_positions.begin() + i);
-	// 		continue;
-	// 	}
-	// 	++i;
-	// }
+		if (!found) {
+			m_sensed_positions.erase(m_sensed_positions.begin() + i);
+			continue;
+		}
+		++i;
+	}
 }
 
 
@@ -114,7 +122,7 @@ void RobotNavigationAlgorithm::noGlobalPlanner()
 void RobotNavigationAlgorithm::applyGlobalPlanner()
 {
 	// FIXME
-	// return;
+	return;
 
 	// TODO: change again
 	Point3f current_robot_position{};
@@ -238,6 +246,9 @@ void RobotNavigationAlgorithm::plan()
 		std::cout << "current evasion waypoint: " << m_evasion_waypoint << std::endl;
 
 	bool pedestrian_collision_detected{false};
+
+	// DEBUG
+	std::cout << "current position: " << m_current_robot_position << std::endl;
 
 
 	double distance_to_goal{Utils::euclideanDistance(m_own_positions.at(m_own_positions.size() - 1), m_waypoints.at(m_waypoints.size() - 1))};
@@ -503,6 +514,7 @@ void RobotNavigationAlgorithm::plan()
 
 			Point3f r_new_position{r_last_position.x + (float)r_new_x, r_last_position.y + (float)r_new_y, 0.0};
 
+			/*
 			if (obstacleCollisionDetected(r_new_position)) {
 
 				if (m_debug)
@@ -512,6 +524,7 @@ void RobotNavigationAlgorithm::plan()
 				//applyGlobalPlanner();
 				break;
 			}
+			*/
 
 			// position for pedestrians
 			// TODO: selected pedestrians only
@@ -683,7 +696,7 @@ void RobotNavigationAlgorithm::plan()
 		if (m_debug) {
 			std::cout << "current mode: " << m_navigation_mode << std::endl;
 			std::cout << "current evasion waypoint: " << m_current_evasion_waypoint << std::endl;
-			std::cout << "current waypoint: " << m_waypoints.at(0);
+			std::cout << "current waypoint: " << m_waypoints.at(0) << std::endl;
 			std::cout << "no collsions detected\n";
 		}
 			

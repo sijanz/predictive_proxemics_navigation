@@ -38,6 +38,7 @@
 
 #include "object_2d_space.h"
 #include <vecmath.h>
+#include <nav_msgs/OccupancyGrid.h>
 
 
 /**
@@ -78,7 +79,6 @@ public:
      * @brief Standard constructor. Initializes the status as well as the pose and velocity with their default values.
      */
     StatusModule() = default;
-
 
     /*
      * ********** INHERITED METHODS **********

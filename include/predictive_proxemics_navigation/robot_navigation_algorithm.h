@@ -30,6 +30,8 @@ public:
 
     inline const bool mapTraversibleReadIn() const { return m_map_traversible_read_in; }
 
+    AStar m_a_star{};
+
 private:
     bool m_debug = false;
     float m_navigation_waypoint_met;
@@ -40,14 +42,15 @@ private:
     float m_evasion_inner_score_intersection_weight;
     float m_evasion_inner_score_intrusion_weight;
 
+    Point3f m_start_position{};
+    Point3f m_goal_position{};
+
     bool m_no_global_planner{false};
 
     bool m_inital_path_set = false;
 
     float m_sim_time;
     double m_evasion_distance{};
-
-    AStar m_a_star{};
 
     std::vector<std::vector<int>> m_traversible;
 

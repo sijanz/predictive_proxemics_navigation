@@ -39,6 +39,9 @@
 
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Point32.h>
+#include <deque>
+#include <vecmath.h>
 
 #include "status_module.h"
 
@@ -60,6 +63,8 @@ public:
      */
     ControlModule();
 
+    ControlModule(const Point3f& t_start_position, const Point3f& t_goal_position);
+
 
     /*
      * ********** GETTERS **********
@@ -71,6 +76,8 @@ public:
      * @return a pointer to the waypoint list
      */
     inline const std::shared_ptr<std::deque<geometry_msgs::PointStamped>> waypoints() const { return m_waypoint_list; }
+
+    inline const Point3f startPosition() const { return m_start_position; }
 
 
     /*
@@ -127,6 +134,9 @@ private:
 
     /** @brief The time the last waypoint is set. */
     ros::Time m_last_waypoint_time{};
+
+    Point3f m_start_position{};
+    Point3f m_goal_position{};
 };
 
 
