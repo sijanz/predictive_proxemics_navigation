@@ -102,6 +102,9 @@ geometry_msgs::Twist ControlModule::velocityCommand(const geometry_msgs::PoseSta
 
     auto speed_linear{0.6};
 
+    if (distance_to_goal < 1.0)
+        speed_linear = 0.6 * distance_to_goal;
+
     // robot has reached the goal
     if (distance_to_goal < 0.3) {
 

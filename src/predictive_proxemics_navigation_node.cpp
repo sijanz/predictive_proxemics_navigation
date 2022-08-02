@@ -135,12 +135,14 @@ void PredictiveProxemicsNavigation::runLoop()
         waypoint_to_publish.pose.position.y = waypoint.point.y;
         waypoint_to_publish.pose.orientation.w = 1.0;
         
+        // TODO: test
+        m_velocity_command_pub.publish(m_control_module.velocityCommand(m_status_module.robotPose(), Point3f{waypoint.point.x, waypoint.point.y, waypoint.point.z}));
 
         // only publish new waypoints to prevent flooding
-        if (waypoint != last_waypoint) {
-            m_goal_pub.publish(waypoint_to_publish);
-            last_waypoint = waypoint;
-        }
+        // if (waypoint != last_waypoint) {
+        //     m_goal_pub.publish(waypoint_to_publish);
+        //     last_waypoint = waypoint;
+        // }
 
 
         // TODO: publish markers in RViz
