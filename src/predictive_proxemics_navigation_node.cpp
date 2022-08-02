@@ -55,30 +55,39 @@ PredictiveProxemicsNavigation::PredictiveProxemicsNavigation(const std::string& 
 {
     m_name = t_name;
 
+    // subscribe to topics
     m_bumper_sub = m_nh.subscribe("/mobile_base/events/bumper", 10, &PredictiveProxemicsNavigation::bumperCallback, this);
     m_odom_sub = m_nh.subscribe("/odom", 10, &PredictiveProxemicsNavigation::odometryCallback, this);
     m_map_sub = m_nh.subscribe("/map", 10, &PredictiveProxemicsNavigation::mapCallback, this);
-    m_pedestrian_sub = m_nh.subscribe("/People_PC", 10, &PredictiveProxemicsNavigation::pedestrianCallback, this);
+    m_pedestrian_sub = m_nh.subscribe("/path_smoothed", 1, &PredictiveProxemicsNavigation::pedestrianCallback, this);
 
+    // advertise to topics
+    m_velocity_command_pub = m_nh.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1000);
+    m_visualization_pub = m_nh.advertise<visualization_msgs::Marker>("robust_people_follower/markers", 10);
+    m_goal_pub = m_nh.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
+
+    // variables that hold launch parameter values
+    std::string log_file_path{""};
     float robot_start_x{0.0};
     float robot_start_y{0.0};
     float robot_goal_x{0.0};
     float robot_goal_y{0.0};
 
+    // read in parameters
+    m_parameter_nh.param("logFilePath", log_file_path, log_file_path);
     m_parameter_nh.param("robotStartX", robot_start_x, robot_start_x);
     m_parameter_nh.param("robotStartY", robot_start_y, robot_start_y);
     m_parameter_nh.param("robotGoalX", robot_goal_x, robot_goal_x);
     m_parameter_nh.param("robotGoalY", robot_goal_y, robot_goal_y);
 
-    m_velocity_command_pub = m_nh.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1000);
-    m_visualization_pub = m_nh.advertise<visualization_msgs::Marker>("robust_people_follower/markers", 10);
-    m_goal_pub = m_nh.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
-
+    // TODO: use traversible map
     std::vector<std::vector<int>> traversible{};
+
+    // robot start and end point
     Point3f robot_start{robot_start_x, robot_start_y, 0.0};
     Point3f robot_goal{robot_goal_x, robot_goal_y, 0.0};
 
-    m_navigation_algorithm = RobotNavigationAlgorithm{0.05, 1.2, traversible, robot_start, robot_goal};
+    m_navigation_algorithm = RobotNavigationAlgorithm{0.05, 1.2, traversible, robot_start, robot_goal, log_file_path};
 }
 
 
@@ -106,6 +115,7 @@ void PredictiveProxemicsNavigation::runLoop()
 //    auto start_time{ros::Time::now().toSec()};
 
     bool flag{false};
+    geometry_msgs::PointStamped last_waypoint{};
 
     while (ros::ok()) {
 
@@ -113,77 +123,27 @@ void PredictiveProxemicsNavigation::runLoop()
 
         processCallbacks();
 
-        m_navigation_algorithm.sense(m_status_module.robotPosition(), m_tracking_module.trackedPedestrianPositions());
+        m_navigation_algorithm.sense(ros::Time::now(), m_status_module.robotPose(), m_tracking_module.m_tracked_pedestrian_positions);
         m_navigation_algorithm.plan();
-        Point3f waypoint{m_navigation_algorithm.act()};
+        auto waypoint{m_navigation_algorithm.act()};
 
-        if (!flag) {
-            geometry_msgs::PoseStamped pose{};
-            pose.header.frame_id = "map";
-            pose.header.stamp = ros::Time::now();
-            pose.pose.position.x = 5.0;
-            pose.pose.position.y = 5.0;
-            pose.pose.orientation.w = 1.0;
-            m_goal_pub.publish(pose);
+        // convert waypoint to a stamped pose
+        geometry_msgs::PoseStamped waypoint_to_publish{};
+        waypoint_to_publish.header.frame_id = "map";
+        waypoint_to_publish.header.stamp = ros::Time::now();
+        waypoint_to_publish.pose.position.x = waypoint.point.x;
+        waypoint_to_publish.pose.position.y = waypoint.point.y;
+        waypoint_to_publish.pose.orientation.w = 1.0;
+        
 
-            // MoveBaseClient ac("move_base", false);
-            // ac.sendGoal(pose);
-            //flag = true;
+        // only publish new waypoints to prevent flooding
+        if (waypoint != last_waypoint) {
+            m_goal_pub.publish(waypoint_to_publish);
+            last_waypoint = waypoint;
         }
 
-        // DEBUG
-        // std::cout << "act: waypoint: " << waypoint << std::endl;
 
-        // FIXME:
-        // m_velocity_command_pub.publish(m_control_module.velocityCommand(m_status_module.pose(), waypoint));
-
-
-        /*
-        // check the robot's status
-        switch (m_status_module.status()) {
-            case StatusModule::Status::FOLLOWING:
-                followTarget();
-                break;
-            case StatusModule::Status::LOS_LOST:
-                searchForTarget();
-                break;
-            case StatusModule::Status::SEARCHING:
-                searchForTarget();
-                break;
-            default:
-                break;
-        }
-        */
-
-        // TODO: publish markers to view in RViz
-        // publishPersonMarkers();
-        // publishWaypoints();
-
-        // auto end{std::chrono::system_clock::now()};
-
-        // std::chrono::duration<double> elapsed_time{end - start};
-
-        // print out program information on the screen
-        // debugPrintout();
-
-        // LOG
-//        auto current_time{ros::Time::now().toSec() - start_time};
-//        if (m_status_module.status() == StatusModule::Status::FOLLOWING) {
-//            file << current_time << "," << m_tracking_module.target().pose().pose.position.x << ","
-//                 << m_tracking_module.target().pose().pose.position.y << ","
-//                 << m_tracking_module.target().distance() / 1000 << "," << m_tracking_module.target().yDeviation()
-//                 << "," << m_tracking_module.target().velocity() << "," << m_tracking_module.target().meanVelocity()
-//                 << "," << m_tracking_module.target().angle()
-//                 << "," << m_tracking_module.target().meanAngle() << ",0,0,0," << elapsed_time.count() << "\n";
-//        } else if (m_status_module.status() == StatusModule::Status::LOS_LOST
-//                   || m_status_module.status() == StatusModule::Status::SEARCHING) {
-//            file << current_time << ",0,0,0,0,0,0,0,0," << m_recovery_module.predictedTargetPosition().x << ","
-//                 << m_recovery_module.predictedTargetPosition().y << "," << m_recovery_module.predictedVelocity() << ","
-//                 << elapsed_time.count() << "\n";
-//        }
-
-        // delete entries of persons that aren't tracked anymore
-        // m_tracking_module.managePersonList();
+        // TODO: publish markers in RViz
 
         loop_rate.sleep();
     }
@@ -196,13 +156,9 @@ void PredictiveProxemicsNavigation::processCallbacks()
 
     // do an emergency stop if the flag is set
     if (m_emergency_stop) {
-        // m_status_module.status() = StatusModule::Status::WAITING;
 
         // publish Twist message with values initialized to 0
         m_velocity_command_pub.publish(geometry_msgs::Twist{});
-
-        // reset target information
-        // m_tracking_module.target() = Person{};
 
         m_emergency_stop = false;
     }
@@ -219,7 +175,6 @@ void PredictiveProxemicsNavigation::processCallbacks()
 
 void PredictiveProxemicsNavigation::debugPrintout() const
 {
-//    system("clear");
     ROS_INFO_STREAM("\n");
 
     ROS_INFO_STREAM("ROS time: " << ros::Time::now().sec);
@@ -240,32 +195,42 @@ void PredictiveProxemicsNavigation::odometryCallback(const nav_msgs::Odometry::C
     pose_stamped.header.stamp = ros::Time::now();
     pose_stamped.pose = msg->pose.pose;
 
+    // DEBUG
+    std::cout << "received position: " << pose_stamped.pose.position.x << ", " << pose_stamped.pose.position.y << std::endl;
+
     // process data
     m_status_module.processOdometryData(pose_stamped);
 }
 
 
-// TODO: callback for pedestrian data
+// TODO: use smoothed path data
 void PredictiveProxemicsNavigation::pedestrianCallback(const sensor_msgs::PointCloud2ConstPtr &input)
 {
     double ncloud = input->header.stamp.toSec();
-
-    //FIXME
 
     pcl::PointCloud<pcl::PointXYZ> laserCloudIn;
 
     pcl::fromROSMsg(*input, laserCloudIn);
 
-    std::vector<Point3f> pedestrian_positions{};
+    // std::vector<Point3f> pedestrian_positions{};
 
+    // FIXME: split later on
+    std::vector<geometry_msgs::PoseStamped> tracked_positions{};
     for (int i = 0; i < laserCloudIn.size(); i++) {
 
-        std::cout << "x = " << laserCloudIn[i].x << " , y = " << laserCloudIn[i].y << " , y = " << laserCloudIn[i].z << "\n";
+        geometry_msgs::PoseStamped current_pose{};
+        current_pose.header.frame_id = "map";
+        current_pose.header.stamp = ros::Time::now();
+        current_pose.pose.position.x = laserCloudIn[i].x;
+        current_pose.pose.position.y = laserCloudIn[i].y;
 
-        pedestrian_positions.emplace_back(Point3f{laserCloudIn[i].x, laserCloudIn[i].y, 0.0});
+        tracked_positions.emplace_back(current_pose);
     }
 
-    m_tracking_module.trackedPedestrianPositions() = pedestrian_positions;
+    std::vector<std::vector<geometry_msgs::PoseStamped>> tracked_pedestrian_positions{};
+    tracked_pedestrian_positions.emplace_back(tracked_positions);
+
+    m_tracking_module.m_tracked_pedestrian_positions = tracked_pedestrian_positions;
 }
 
 

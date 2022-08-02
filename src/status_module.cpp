@@ -75,7 +75,9 @@ void StatusModule::processOdometryData(const geometry_msgs::PoseStamped& t_pose_
         ROS_INFO_STREAM("processing odometry data");
 
         m_current_pose = t_pose_stamped;
-        m_robot_position = Point3f{m_current_pose.pose.position.x, m_current_pose.pose.position.y, 0.0};
+
+        // m_robot_position = Point3f{m_current_pose.pose.position.x, m_current_pose.pose.position.y, 0.0};
+
         calculateVelocity();
         updatePose();
         m_values_set = true;

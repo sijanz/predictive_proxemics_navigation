@@ -9,39 +9,32 @@ RobotNavigationAlgorithm::RobotNavigationAlgorithm() : m_group_detector{GroupDet
 }
 
 
-RobotNavigationAlgorithm::RobotNavigationAlgorithm(float t_time_step, float t_max_speed, const std::vector<std::vector<int>> t_traversible, const Point3f& t_start, const Point3f& t_goal) : m_group_detector{GroupDetector{}}
+RobotNavigationAlgorithm::RobotNavigationAlgorithm(float t_time_step, float t_max_speed, const std::vector<std::vector<int>> t_traversible, const Point3f& t_start, const Point3f& t_goal, const std::string& t_log_file_path) : m_group_detector{GroupDetector{}}
 {
 	// TODO: DEBUG
 	m_debug = true;
+
+	m_log_file = std::ofstream{t_log_file_path};
+
+	if (m_log_file.is_open())
+		m_log_file << "timestamp;robot_position_x;robot_position_y;distance_to_person\n";
 
 	m_start_position = t_start;
 	m_goal_position = t_goal;
 
 	m_traversible = t_traversible;
 
-
-	// for (auto& row : m_traversible) {
-	// 	for (auto& pixel : row) {
-	// 		if (pixel == 0) {
-	// 			pixel = 100;
-	// 		} else {
-	// 			pixel = 0;
-	// 		}
-	// 	}
-	// }
-
 	m_a_star = AStar();
-
 
     m_time_step = t_time_step;
 	m_max_speed = t_max_speed;
 	m_goal = t_goal;
 
-	m_waypoints.emplace_front(t_start);
+	// m_waypoints.emplace_front(t_start);
 	m_waypoints.emplace_back(t_goal);
 
 	m_navigation_waypoint_met = 0.2;
-    m_prediction_horizon = 3.0;
+    m_prediction_horizon = 4.0;
     m_proxemics_function_a_weight = 2.0;
     m_proxemics_function_sigma = 1.0;
     m_evasion_proxemics_data_points_step = 0.05;
@@ -49,67 +42,107 @@ RobotNavigationAlgorithm::RobotNavigationAlgorithm(float t_time_step, float t_ma
     m_evasion_inner_score_intrusion_weight = 0.5;
 
 	m_prediction_distance_threshold = 1.2 * m_prediction_horizon + m_max_speed * m_prediction_horizon;
-
-	/*
-	for (int i{0}; i < m_agents->size() - 1; ++i)
-		m_sensed_positions.emplace_back(std::deque<Point3f>{});
-		*/
 }
 
 
-void RobotNavigationAlgorithm::sense(const Point3f& t_robot_position, const std::vector<Point3f>& t_pedestrian_positions)
+void RobotNavigationAlgorithm::sense(const ros::Time& t_timestamp, const geometry_msgs::PoseStamped& t_robot_position, const std::vector<std::vector<geometry_msgs::PoseStamped>>& t_pedestrian_positions)
 {
+	m_log_current_timestamp = t_timestamp.toNSec();
 
 	if (!m_inital_path_set && !m_no_global_planner) {
 		applyGlobalPlanner();
 		m_inital_path_set = true;
 	}
 
+	// DEBUG
+	std::cout << "size of vector: " << t_pedestrian_positions.size() << std::endl;
+
+	// DEBUG
+	// if (t_pedestrian_positions.size() > 0) {
+	// 	std::cout << "current pedestrian position: " << t_pedestrian_positions.at(0).at(t_pedestrian_positions.at(0).size() - 1).pose.position.x << " " << t_pedestrian_positions.at(0).at(t_pedestrian_positions.at(0).size() - 1).pose.position.y << std::endl;
+	// }
 	// set own position
-	m_own_positions.emplace_back(Point3f{t_robot_position.x + m_start_position.x, t_robot_position.y + m_start_position.y, 0.0});
+	geometry_msgs::PoseStamped position_to_add{t_robot_position};
+	position_to_add.pose.position.x += m_start_position.x;
+	position_to_add.pose.position.y += m_start_position.y;
+
+	m_log_current_robot_position_x = position_to_add.pose.position.x;
+	m_log_current_robot_position_y = position_to_add.pose.position.y;
+
+	if (!t_pedestrian_positions.empty()) {
+		if (!t_pedestrian_positions.at(0).empty()) {
+			m_log_current_distance_to_pedestrian = Utils::euclideanDistance(Point3f{position_to_add.pose.position.x, position_to_add.pose.position.x, 0.0}, Point3f{t_pedestrian_positions.at(0).at(t_pedestrian_positions.at(0).size() - 1).pose.position.x, t_pedestrian_positions.at(0).at(t_pedestrian_positions.at(0).size() - 1).pose.position.y, 0.0});
+		}
+	} else {
+		m_log_current_distance_to_pedestrian = 999.0;
+	}
+
+	// DEBUG
+	std::cout << "navigation algorithm: received position " << position_to_add.pose.position.x << ", "  << position_to_add.pose.position.y << std::endl;
+
+	m_own_positions.emplace_back(position_to_add);
 
 	if (m_own_positions.size() >= 10)
 		m_own_positions.pop_front();
 
-	// TODO: store pedestrian positions	
-	for (const auto& pedestrian : t_pedestrian_positions) {
+	if (m_sensed_positions.empty()) {
+		std::deque<geometry_msgs::PoseStamped> deque{};
+		m_sensed_positions.emplace_back(std::make_pair("", deque));
+	}
 
-		bool found{false};
-		for (auto& sensed : m_sensed_positions) {
-			if (!sensed.second.empty()) {
-				if (Utils::euclideanDistance(pedestrian, sensed.second.at(sensed.second.size() - 1)) < 0.5) {
-					found = true;
-					sensed.second.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
-				}
-			}
-		}
+	if (!t_pedestrian_positions.empty()) {
+		for (const auto& pose : t_pedestrian_positions.at(0)) {
 
-		if (!found) {
-			std::deque<Point3f> deque{};
-			deque.emplace_back(Point3f{pedestrian.x, pedestrian.y, 0.0});
-			m_sensed_positions.emplace_back(std::make_pair("", deque));
+			// FIXME: maybe back
+			m_sensed_positions.at(0).second.emplace_back(pose);
 		}
 	}
+
+	// m_sensed_positions.at(0).second
+
+	// // TODO: store pedestrian positions	
+	// for (const auto& pedestrian : t_pedestrian_positions) {
+
+	// 	// TODO: check if that is the latest pose
+	// 	Point3f pedestrian_position{pedestrian.at(0).pose.orientation.x, pedestrian.at(0).pose.orientation.y, 0.0};
+
+	// 	bool found{false};
+	// 	for (auto& sensed : m_sensed_positions) {
+	// 		if (!sensed.second.empty()) {
+	// 			Point3f sensed_point{sensed.second.at(sensed.second.size() - 1).pose.position.x, sensed.second.at(sensed.second.size() - 1).pose.position.y, 0.0};
+	// 			if (Utils::euclideanDistance(pedestrian_position, sensed_point) < 0.5) {
+	// 				found = true;
+	// 				sensed.second.emplace_back(pedestrian.at(0));
+	// 			}
+	// 		}
+	// 	}
+
+	// 	if (!found) {
+	// 		std::deque<geometry_msgs::PoseStamped> deque{};
+	// 		deque.emplace_back(pedestrian.at(0));
+	// 		m_sensed_positions.emplace_back(std::make_pair("", deque));
+	// 	}
+	// }
 
 	// TODO: test: delete pedestrians 
-	int i{0};
-	for (const auto& position : t_pedestrian_positions) {
-		bool found{false};
-		for (const auto& sensed : m_sensed_positions) {
-			if (!sensed.second.empty()) {
-				if (!(position.x == sensed.second.at(sensed.second.size() - 1).x && position.y == sensed.second.at(sensed.second.size() - 1).y)) {
-					found = true;
-					break;
-				}
-			}
-		}
+	// int i{0};
+	// for (const auto& position : t_pedestrian_positions) {
+	// 	bool found{false};
+	// 	for (const auto& sensed : m_sensed_positions) {
+	// 		if (!sensed.second.empty()) {
+	// 			if (!(position.x == sensed.second.at(sensed.second.size() - 1).x && position.y == sensed.second.at(sensed.second.size() - 1).y)) {
+	// 				found = true;
+	// 				break;
+	// 			}
+	// 		}
+	// 	}
 
-		if (!found) {
-			m_sensed_positions.erase(m_sensed_positions.begin() + i);
-			continue;
-		}
-		++i;
-	}
+	// 	if (!found) {
+	// 		m_sensed_positions.erase(m_sensed_positions.begin() + i);
+	// 		continue;
+	// 	}
+	// 	++i;
+	// }
 }
 
 
@@ -128,8 +161,10 @@ void RobotNavigationAlgorithm::applyGlobalPlanner()
 	Point3f current_robot_position{};
 	if (m_own_positions.size() == 0)
 		current_robot_position = m_waypoints.at(0);
-	else
-		current_robot_position = m_own_positions.at(m_own_positions.size() - 1);
+	else {
+		Point3f last_own_position{m_own_positions.at(m_own_positions.size() - 1).pose.position.x, m_own_positions.at(m_own_positions.size() - 1).pose.position.y, 0.0};
+		current_robot_position = last_own_position;
+	}
 
 	if (m_debug) {
 		std::cout << "m_own_positions:\n";
@@ -205,35 +240,36 @@ bool RobotNavigationAlgorithm::obstacleCollisionDetected(const Point3f& t_positi
 
 Vector3f RobotNavigationAlgorithm::drivingForce()
 {
-    const float T = 0.54F;	// relaxation time based on (Moussaid et al., 2009)
-	Vector3f e_i, f_i;
+	return Vector3f{};
+    // const float T = 0.54F;	// relaxation time based on (Moussaid et al., 2009)
+	// Vector3f e_i, f_i;
 
-	std::cout << "waypoints:\n";
-	for (const auto& w : m_waypoints)
-		std::cout << w << std::endl;
+	// std::cout << "waypoints:\n";
+	// for (const auto& w : m_waypoints)
+	// 	std::cout << w << std::endl;
 
-	if (m_waypoints.at(0).x == m_own_positions.at(m_own_positions.size() - 1).x && m_waypoints.at(0).y == m_own_positions.at(m_own_positions.size() - 1).y) {
-		std::cout << "same waypoint, popping!\n";
+	// if (m_waypoints.at(0).x == m_own_positions.at(m_own_positions.size() - 1).x && m_waypoints.at(0).y == m_own_positions.at(m_own_positions.size() - 1).y) {
+	// 	std::cout << "same waypoint, popping!\n";
 
-		if (m_waypoints.size() > 1)
-			m_waypoints.pop_front();
-	}
+	// 	if (m_waypoints.size() > 1)
+	// 		m_waypoints.pop_front();
+	// }
 
 
-    // compute desired direction
-	e_i = m_waypoints.at(0) - m_own_positions.at(m_own_positions.size() - 1);
-	e_i.normalize();
+    // // compute desired direction
+	// e_i = m_waypoints.at(0) - m_own_positions.at(m_own_positions.size() - 1);
+	// e_i.normalize();
 
-    // compute driving force
-	f_i = ((m_desired_speed * e_i) - m_velocity_vector) * (1 / T);
+    // // compute driving force
+	// f_i = ((m_desired_speed * e_i) - m_velocity_vector) * (1 / T);
 
-	std::cout << "current pos: " << m_own_positions.at(m_own_positions.size() - 1) << std::endl;
-	std::cout << "waypoints at 0: " << m_waypoints.at(0) << std::endl;
-	std::cout << "ei: " << e_i << std::endl;
-	std::cout << "desired speed: " << m_desired_speed << std::endl;
-	std::cout << "driving force: " << f_i << std::endl;
+	// std::cout << "current pos: " << m_own_positions.at(m_own_positions.size() - 1) << std::endl;
+	// std::cout << "waypoints at 0: " << m_waypoints.at(0) << std::endl;
+	// std::cout << "ei: " << e_i << std::endl;
+	// std::cout << "desired speed: " << m_desired_speed << std::endl;
+	// std::cout << "driving force: " << f_i << std::endl;
 
-	return f_i;
+	// return f_i;
 }
 
 
@@ -241,6 +277,22 @@ void RobotNavigationAlgorithm::plan()
 {
 	// if (!m_no_global_planner)
 	// 	applyGlobalPlanner();
+
+	// DEBUG
+	std::cout << "sensed positions size: " << m_sensed_positions.size() << std::endl;
+
+	//std::cout << "current waypoint: " << m_waypoints.at(0).x << m_waypoints.at(0).y << std::cout;
+
+
+	if (m_sensed_positions.size() > 0) {
+		if (m_sensed_positions.at(0).second.size() == 0) {
+			return;
+		}
+		// std::cout << "points first person size: " << m_sensed_positions.at(0).second.size() << std::endl;
+		// for (const auto& pose : m_sensed_positions.at(0).second) {
+		// 	std::cout << pose.pose.position.x << " " << pose.pose.position.y << std::endl;
+		// }
+	}
 
 	if (m_debug)
 		std::cout << "current evasion waypoint: " << m_evasion_waypoint << std::endl;
@@ -250,8 +302,8 @@ void RobotNavigationAlgorithm::plan()
 	// DEBUG
 	std::cout << "current position: " << m_current_robot_position << std::endl;
 
-
-	double distance_to_goal{Utils::euclideanDistance(m_own_positions.at(m_own_positions.size() - 1), m_waypoints.at(m_waypoints.size() - 1))};
+	Point3f latest_own_position{m_own_positions.at(m_own_positions.size() - 1).pose.position.x, m_own_positions.at(m_own_positions.size() - 1).pose.position.y, 0.0};
+	double distance_to_goal{Utils::euclideanDistance(latest_own_position, m_waypoints.at(m_waypoints.size() - 1))};
 
 	/*
 	if (obstacleCollisionDetected()) {
@@ -273,7 +325,7 @@ void RobotNavigationAlgorithm::plan()
 	if (m_debug)
 		std::cout << "current speed: " << m_current_speed << std::endl;
 
-	auto waypoint_difference{Utils::euclideanDistance(m_own_positions.at(m_own_positions.size() - 1), m_waypoints.at(0))};
+	auto waypoint_difference{Utils::euclideanDistance(latest_own_position, m_waypoints.at(0))};
 
 	if ((waypoint_difference < m_navigation_waypoint_met) && m_waypoints.size() > 1) {
 
@@ -316,7 +368,8 @@ void RobotNavigationAlgorithm::plan()
 	// set desired_speed
 	float min_distance{MAXFLOAT};
 	for (const auto& sensed : m_sensed_positions) {
-		auto distance{Utils::euclideanDistance(m_own_positions.at(m_own_positions.size() - 1), sensed.second.at(sensed.second.size() - 1))};
+		Point3f sensed_position{sensed.second.at(sensed.second.size() - 1).pose.position.x, sensed.second.at(sensed.second.size() - 1).pose.position.y, 0.0};
+		auto distance{Utils::euclideanDistance(latest_own_position, sensed_position)};
 
 		if (distance < min_distance) {
 			min_distance = distance;
@@ -333,7 +386,7 @@ void RobotNavigationAlgorithm::plan()
 
 	m_number_of_waypoints = number_of_waypoints;
 
-	double delta_t{0.0};
+	double r_delta_t{0.0};
 
 	// robot's position
 	double r_velocity{0.0};
@@ -341,7 +394,7 @@ void RobotNavigationAlgorithm::plan()
 	double r_acceleration{0.0};
 
 	// TODO: change
-	double r_delta_t{0.05};
+	// double r_delta_t{0.05};
 
 	double r_theta{0.0};
 
@@ -352,12 +405,15 @@ void RobotNavigationAlgorithm::plan()
 	std::vector<Point3f> p_last_positions{};
 
 	if (!m_own_positions.empty())
-		r_last_position = m_own_positions.at(m_own_positions.size() - 1);
+		r_last_position = latest_own_position;
 
 	// FIXME: introduces bugs!
 	for (int j{0}; j < m_sensed_positions.size(); ++j) {
-		if (!m_sensed_positions.at(j).second.empty())
-			p_last_positions.emplace_back(m_sensed_positions.at(j).second.at(m_sensed_positions.at(j).second.size() - 1));
+		if (!m_sensed_positions.at(j).second.empty()) {
+			Point3f point{m_sensed_positions.at(j).second.at(m_sensed_positions.at(j).second.size() - 1).pose.position.x, m_sensed_positions.at(j).second.at(m_sensed_positions.at(j).second.size() - 1).pose.position.y, 0.0};
+
+			p_last_positions.emplace_back(point);
+		}
 	}
 
 	Point3f current_position{};
@@ -367,14 +423,23 @@ void RobotNavigationAlgorithm::plan()
 		std::vector<double> robot_yaw_rates{};
 		std::vector<double> robot_velocities{};
 
+		double r_delta_t{0.0};
+
 		for (int r_i{(int)m_own_positions.size() - d_n}; r_i < m_own_positions.size() - 1; ++r_i) {
-			auto velocity{static_cast<Vector3f>(m_own_positions.at(r_i + 1) - m_own_positions.at(r_i)).length()};
+			// auto velocity{static_cast<Vector3f>(m_own_positions.at(r_i + 1) - m_own_positions.at(r_i)).length()};
+			
+			auto distance{Utils::euclideanDistance(Point3f{m_own_positions.at(r_i + 1).pose.position.x, m_own_positions.at(r_i + 1).pose.position.y, 0.0}, Point3f{m_own_positions.at(r_i).pose.position.x, m_own_positions.at(r_i).pose.position.y, 0.0})};
+			r_delta_t = std::abs((m_own_positions.at(r_i + 1).header.stamp - m_own_positions.at(r_i).header.stamp).toSec());
+			auto velocity{distance / r_delta_t};
+
+			// DEBUG
+			std::cout << "robot velocity: " << velocity << std::endl;
 
 			r_velocity += velocity;
 			robot_velocities.emplace_back(velocity);
 
-			Point3f old_position{m_own_positions.at(r_i)};
-			current_position = m_own_positions.at(r_i + 1);
+			Point3f old_position{m_own_positions.at(r_i).pose.position.x, m_own_positions.at(r_i).pose.position.y, 0.0};
+			current_position = Point3f{m_own_positions.at(r_i + 1).pose.position.x, m_own_positions.at(r_i + 1).pose.position.y, 0.0};
 
 			auto theta{atan2(current_position.y - old_position.y, current_position.x - old_position.x)};
 
@@ -388,7 +453,11 @@ void RobotNavigationAlgorithm::plan()
 		m_current_robot_position = current_position;
 		m_current_robot_heading = r_theta;
 
+		// FIXME: use ros time
 		r_velocity /= (d_n * r_delta_t);
+
+		// DEBUG
+		std::cout << "robot velocity after: " << r_velocity << std::endl;
 
 		m_current_speed = r_velocity;
 
@@ -432,7 +501,9 @@ void RobotNavigationAlgorithm::plan()
 		// calculate values for detected pedestrians
 		for (auto j{0}; j < m_sensed_positions.size(); ++j) {
 
-			if (Utils::euclideanDistance(m_sensed_positions.at(j).second.at(m_sensed_positions.at(j).second.size() - 1), m_own_positions.at(m_own_positions.size() - 1))
+			Point3f sensed_point{Point3f{m_sensed_positions.at(j).second.at(m_sensed_positions.at(j).second.size() - 1).pose.position.x, m_sensed_positions.at(j).second.at(m_sensed_positions.at(j).second.size() - 1).pose.position.y, 0.0}};
+
+			if (Utils::euclideanDistance(sensed_point, latest_own_position)
 				< m_prediction_distance_threshold) {
 					predicted_pedestrian_indeces.emplace_back(j);
 				}
@@ -450,15 +521,22 @@ void RobotNavigationAlgorithm::plan()
 
 
 			for (int r_i{(int)m_sensed_positions.at(j).second.size() - d_n}; r_i < m_sensed_positions.at(j).second.size() - 1; ++r_i) {
-				auto velocity{static_cast<Vector3f>(m_sensed_positions.at(j).second.at(r_i + 1) - m_sensed_positions.at(j).second.at(r_i)).length()};
+				// auto velocity{static_cast<Vector3f>(m_sensed_positions.at(j).second.at(r_i + 1) - m_sensed_positions.at(j).second.at(r_i)).length()};
+
+				auto distance{Utils::euclideanDistance(Point3f{m_sensed_positions.at(j).second.at(r_i + 1).pose.position.x, m_sensed_positions.at(j).second.at(r_i + 1).pose.position.y, 0.0}, Point3f{m_sensed_positions.at(j).second.at(r_i).pose.position.x, m_sensed_positions.at(j).second.at(r_i).pose.position.y, 0.0})};
+
+				auto velocity{distance / 0.1};
+
+				// DEBUG
+				std::cout << "pedestrian velocity: " << velocity << std::endl;
 
 				p_velocity += velocity;
 
 				if (velocity < 3.0)
 					pedestrian_velocities.emplace_back(velocity);
 
-				Point3f old_position{m_sensed_positions.at(j).second.at(r_i)};
-				Point3f current_position{m_sensed_positions.at(j).second.at(r_i + 1)};
+				Point3f old_position{m_sensed_positions.at(j).second.at(r_i).pose.position.x, m_sensed_positions.at(j).second.at(r_i).pose.position.y, 0.0};
+				Point3f current_position{m_sensed_positions.at(j).second.at(r_i + 1).pose.position.x, m_sensed_positions.at(j).second.at(r_i + 1).pose.position.y, 0.0};
 
 				auto theta{Utils::localAngle(old_position, current_position)};
 
@@ -468,6 +546,9 @@ void RobotNavigationAlgorithm::plan()
 			}
 
 			p_velocity /= (d_n * r_delta_t);
+
+			// DEBUG
+			std::cout << "pedestrian velocity after: " << p_velocity << std::endl;
 
 			if (pedestrian_yaw_rates.size() > 0) {
 				for (int y_i{0}; y_i < pedestrian_yaw_rates.size() - 1; ++y_i)
@@ -488,6 +569,8 @@ void RobotNavigationAlgorithm::plan()
 			pedestrian_values.at(j).emplace_back(p_theta);
 
 		}
+
+		double delta_t{0.0};
 
 		// in prediction
 		while (delta_t <= m_prediction_horizon) {
@@ -719,9 +802,22 @@ void RobotNavigationAlgorithm::plan()
 }
 
 
-Point3f RobotNavigationAlgorithm::act()
+geometry_msgs::PointStamped RobotNavigationAlgorithm::act()
 {
-	return m_waypoints.at(0);
+	// logging
+	if (m_log_file.is_open())
+		m_log_file << m_log_current_timestamp << ";" << m_log_current_robot_position_x << ";" << m_log_current_robot_position_y << ";" << m_log_current_distance_to_pedestrian << "\n";
+
+	geometry_msgs::PointStamped current_waypoint{};
+	current_waypoint.header.frame_id = "map";
+	current_waypoint.header.stamp = ros::Time::now();
+	current_waypoint.point.x = m_waypoints.at(0).x;
+	current_waypoint.point.y = m_waypoints.at(0).y;
+
+	// DEBUG
+	std::cout << "act: sending waypoint " << current_waypoint.point.x << ", " << current_waypoint.point.y << std::endl;
+
+	return current_waypoint;
 	// if (!m_waypoints.empty()) {
 		
 	// 	// compute social force

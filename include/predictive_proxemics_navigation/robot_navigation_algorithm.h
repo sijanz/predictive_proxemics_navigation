@@ -3,6 +3,10 @@
 #include <map>
 #include <vector>
 #include <deque>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Point.h>
+#include <ostream>
+
 #include "pedestrian.h"
 #include "utils.h"
 #include "navigation_algorithm.h"
@@ -19,14 +23,14 @@ class RobotNavigationAlgorithm : public NavigationAlgorithm
 {
 public:
     RobotNavigationAlgorithm();
-    RobotNavigationAlgorithm(float t_time_step, float t_max_speed, const std::vector<std::vector<int>> t_traversible, const Point3f& t_start, const Point3f& t_goal);
+    RobotNavigationAlgorithm(float t_time_step, float t_max_speed, const std::vector<std::vector<int>> t_traversible, const Point3f& t_start, const Point3f& t_goal, const std::string& t_log_file_path);
     NAVIGATION_MODE m_navigation_mode = NORMAL;
 
     void noGlobalPlanner();
 
-    void sense(const Point3f& t_robot_position, const std::vector<Point3f>& t_pedestrian_positions);
+    void sense(const ros::Time& t_timestamp, const geometry_msgs::PoseStamped& t_robot_position, const std::vector<std::vector<geometry_msgs::PoseStamped>>& t_pedestrian_positions);
     void plan();
-    Point3f act();
+    geometry_msgs::PointStamped act();
 
     inline const bool mapTraversibleReadIn() const { return m_map_traversible_read_in; }
 
@@ -41,6 +45,13 @@ private:
     float m_evasion_proxemics_data_points_step;
     float m_evasion_inner_score_intersection_weight;
     float m_evasion_inner_score_intrusion_weight;
+
+    std::ofstream m_log_file{};
+
+    double m_log_current_timestamp{};
+    float m_log_current_robot_position_x{};
+    float m_log_current_robot_position_y{};
+    float m_log_current_distance_to_pedestrian{};
 
     Point3f m_start_position{};
     Point3f m_goal_position{};
@@ -62,11 +73,11 @@ private:
 
     bool m_map_traversible_read_in = false;
 
-    std::deque<Point3f> m_own_positions;
+    std::deque<geometry_msgs::PoseStamped> m_own_positions;
     std::vector<Utils::PedestrianInformation> m_pedestrian_positions_at_evasion;
-    std::vector<Utils::PedestrianInformation> m_detected_pedestrians{};
+    // std::vector<Utils::PedestrianInformation> m_detected_pedestrians{};
     GroupDetector m_group_detector;
-    std::vector<std::pair<std::string, std::deque<Point3f>>> m_sensed_positions;
+    std::vector<std::pair<std::string, std::deque<geometry_msgs::PoseStamped>>> m_sensed_positions;
     float m_max_speed;
     float m_desired_speed;
     Vector3f m_velocity_vector{};

@@ -114,7 +114,7 @@ public:
      */
     inline const StatusModule::Status status() const { return m_status; }
 
-    inline const Point3f robotPosition() const { return m_robot_position; }
+    inline const geometry_msgs::PoseStamped robotPose() const { return m_current_pose; }
 
 
     /*

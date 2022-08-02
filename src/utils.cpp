@@ -12,10 +12,7 @@ double Utils::proxemicsFunction(double t_a, double t_x, double t_sigma, double t
 {
    if (t_x > M_PI)
       t_x = 2.0 * M_PI - t_x;
-
-   // DEBUG
-   t_d_min = 0.7;
-
+      
    return ((t_a / (t_sigma * std::sqrt(2.0 * M_PI))) * std::pow(M_E, (-0.5 * std::pow((t_x / t_sigma), 2.0)))) + t_d_min;
 }
 

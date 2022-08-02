@@ -38,6 +38,7 @@
 
 
 #include <vecmath.h>
+#include <geometry_msgs/PoseStamped.h>
 #include "person.h"
 
 
@@ -59,6 +60,8 @@ public:
      */
     TrackingModule();
 
+    std::vector<std::vector<geometry_msgs::PoseStamped>> m_tracked_pedestrian_positions{};
+
 
     /*
      * ********** SETTERS **********
@@ -72,7 +75,7 @@ public:
      */
     inline std::shared_ptr<std::vector<Person>> trackedPersons() { return m_tracked_persons; }
 
-    inline std::vector<Point3f> trackedPedestrianPositions() { return m_tracked_pedestrian_positions; }
+    // inline std::vector<std::vector<geometry_msgs::PoseStamped>> trackedPedestrianPositions() { return m_tracked_pedestrian_positions; }
 
 
     /*
@@ -87,7 +90,7 @@ public:
      */
     inline const std::shared_ptr<std::vector<Person>> trackedPersons() const { return m_tracked_persons; }
 
-    inline const std::vector<Point3f> trackedPedestrianPositions() const { return m_tracked_pedestrian_positions; }
+    // inline const std::vector<std::vector<geometry_msgs::PoseStamped>> trackedPedestrianPositions() const { return m_tracked_pedestrian_positions; }
 
 
     /*
@@ -122,8 +125,6 @@ private:
 
     /** @brief A list persons currently tracked  */
     std::shared_ptr<std::vector<Person>> m_tracked_persons{};
-
-    std::vector<Point3f> m_tracked_pedestrian_positions{};
 
 
     // static bool checkForValidData(const body_tracker_msgs::Skeleton& t_skeleton);
