@@ -116,6 +116,8 @@ public:
 
     inline const geometry_msgs::PoseStamped robotPose() const { return m_current_pose; }
 
+    inline const std::vector<geometry_msgs::PoseStamped> path() const { return m_path; };
+
 
     /*
      * ********** STANDARD METHODS **********
@@ -136,6 +138,8 @@ private:
     Status m_status{};
 
     Point3f m_robot_position{};
+
+    std::vector<geometry_msgs::PoseStamped> m_path;
 };
 
 

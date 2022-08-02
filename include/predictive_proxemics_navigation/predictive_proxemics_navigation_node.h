@@ -130,8 +130,6 @@ public:
      */
     void runLoop();
 
-    ros::Publisher m_goal_pub{};
-
 
 private:
 
@@ -200,6 +198,9 @@ private:
      * rate of 10 times per second. */
     ros::Publisher m_visualization_pub{};
 
+    ros::Publisher m_goal_pub{};
+
+    ros::Publisher m_robot_path_pub{};
 
 
 

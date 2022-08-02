@@ -65,6 +65,7 @@ PredictiveProxemicsNavigation::PredictiveProxemicsNavigation(const std::string& 
     m_velocity_command_pub = m_nh.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1000);
     m_visualization_pub = m_nh.advertise<visualization_msgs::Marker>("robust_people_follower/markers", 10);
     m_goal_pub = m_nh.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
+    m_robot_path_pub = m_nh.advertise<nav_msgs::Path>("/robot_path", 10);
 
     // variables that hold launch parameter values
     std::string log_file_path{""};
@@ -144,6 +145,13 @@ void PredictiveProxemicsNavigation::runLoop()
         //     last_waypoint = waypoint;
         // }
 
+        // publish robot path
+        nav_msgs::Path robot_path{};
+        robot_path.header.frame_id = "map";
+        robot_path.header.stamp = ros::Time::now();
+        robot_path.poses = m_status_module.path();
+
+        m_robot_path_pub.publish(robot_path);
 
         // TODO: publish markers in RViz
 

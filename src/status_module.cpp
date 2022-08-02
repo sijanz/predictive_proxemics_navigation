@@ -78,6 +78,11 @@ void StatusModule::processOdometryData(const geometry_msgs::PoseStamped& t_pose_
 
         // m_robot_position = Point3f{m_current_pose.pose.position.x, m_current_pose.pose.position.y, 0.0};
 
+        m_path.emplace_back(t_pose_stamped);
+
+        if (m_path.size() > 20)
+            m_path.erase(m_path.begin());
+
         calculateVelocity();
         updatePose();
         m_values_set = true;
